@@ -24,8 +24,10 @@ public class ImageDownloader {
         OkHttpClient client = new OkHttpClient.Builder()
                 .proxy(proxy)
                 .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
                 .build();
+
+        String tempPath = savePath + ".part";
 
         Request request = new Request.Builder()
                 .url(imageUrl)
@@ -37,7 +39,26 @@ public class ImageDownloader {
                 throw new RuntimeException("下载失败：" + response);
             }
             InputStream inputStream = response.body().byteStream();
-            FileUtils.copyInputStreamToFile(inputStream, new File(savePath));
+            FileUtils.copyInputStreamToFile(inputStream, new File(tempPath));
+        }
+
+        // 下载成功后重命名
+        File tempFile = new File(tempPath);
+        File finalFile = new File(savePath);
+        if(!tempFile.renameTo(finalFile)){
+            throw new RuntimeException("【图片下载】 重命名文件失败" + tempPath);
+        }
+    }
+
+    public static void deleteFile(String funcName){
+        File downloadDir = new File("downloads");
+        File[] partFiles = downloadDir.listFiles((dir, name) -> name.endsWith(".part"));
+        if(partFiles != null){
+            for(File file : partFiles){
+                if(file.delete()){
+                    System.out.println(funcName + " 已删除未完成文件");
+                }
+            }
         }
     }
 
