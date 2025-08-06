@@ -1,0 +1,102 @@
+package com.pixiv.crawler.model;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class PixivImage {
+    @JsonProperty("id")
+    private String id;
+    @JsonProperty("title")
+    private String title;
+    @JsonProperty("url")
+    private String url;
+    @JsonProperty("tags")
+    private List<String> tags;
+    @JsonProperty("artist")
+    private String artist;
+    @JsonProperty("viewCount")
+    private int viewCount;
+    @JsonProperty("likeCount")
+    private int likeCount;
+    @JsonProperty("bookmarkCount")
+    private int bookmarkCount;
+
+    // 构造函数
+    public PixivImage() {
+        this.tags = new ArrayList<>();
+    }
+
+    public PixivImage(String id, String title, String url, List<String> tags, String artist) {
+        this.id = id;
+        this.title = title;
+        this.url = url;
+        this.tags = tags != null ? tags : new ArrayList<>();
+        this.artist = artist;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public List<String> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
+    }
+
+    public String getArtist() {
+        return artist;
+    }
+
+    public void setArtist(String artist) {
+        this.artist = artist;
+    }
+
+    public int getViewCount() {
+        return viewCount;
+    }
+
+    public void setViewCount(int viewCount) {
+        this.viewCount = viewCount;
+    }
+
+    public int getLikeCount() {
+        return likeCount;
+    }
+
+    public void setLikeCount(int likeCount) {
+        this.likeCount = likeCount;
+    }
+
+    public int getBookmarkCount() {
+        return bookmarkCount;
+    }
+
+    public void setBookmarkCount(int bookmarkCount) {
+        this.bookmarkCount = bookmarkCount;
+    }
+}
