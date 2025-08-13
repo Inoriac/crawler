@@ -2,13 +2,18 @@ package com.pixiv.crawler.config;
 
 // TODO：在整个程序启动的时候，需要检查各个概率之和是否为1
 public class PixivCrawlerConfig {
+    // VPN 端口号
+    public static final int PORT = 7897;
+    // 用户p站的cookie，用于绕过反爬
+    public static final String COOKIE = "";
+    // 起始图片 id
+    public static final String START_PID = "127455493";
+
     // 各队列的选取倾向概率
     public static final double TOP1W_SELECTION_PROBABILITY = 0.5;
     public static final double TOP5K_SELECTION_PROBABILITY = 0.3;
     public static final double TOP3K_SELECTION_PROBABILITY = 0.2;
 
-    // 起始图片 id
-    public static final String START_PID = "123872912";
     // 搜索深度
     public static final int MAX_DEPTH = 4;
     // 每轮选择的起始图片数量

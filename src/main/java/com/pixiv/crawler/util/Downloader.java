@@ -11,7 +11,6 @@ import java.util.concurrent.LinkedBlockingQueue;
  * 多线程图片下载器
  */
 public class Downloader {
-    
     private volatile boolean stopFlag = false;
     private Thread[] threads;
     

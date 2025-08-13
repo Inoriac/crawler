@@ -1,5 +1,6 @@
 package com.pixiv.crawler.util;
 
+import com.pixiv.crawler.config.PixivCrawlerConfig;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -12,6 +13,7 @@ import java.net.Proxy;
 import java.util.concurrent.TimeUnit;
 
 public class ImageDownloader {
+    private static PixivCrawlerConfig crawlerConfig;
     /**
      * 下载图片到本地
      * @param imageUrl 图片的 URL
@@ -19,7 +21,7 @@ public class ImageDownloader {
      * @throws Exception 下载失败时抛出异常
      */
     public static void downloadImage(String imageUrl, String savePath) throws Exception {
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 7897));
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", crawlerConfig.PORT));
         OkHttpClient client = new OkHttpClient.Builder()
                 .proxy(proxy)
                 .connectTimeout(10, TimeUnit.SECONDS)
@@ -47,10 +49,6 @@ public class ImageDownloader {
         if(!tempFile.renameTo(finalFile)){
             throw new RuntimeException("【图片下载】 重命名文件失败" + tempPath);
         }
-    }
-
-    public static void deleteFile(String funcName){
-        deleteFile(funcName, "downloads");
     }
 
     /**
