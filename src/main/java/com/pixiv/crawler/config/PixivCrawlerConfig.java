@@ -1,0 +1,34 @@
+package com.pixiv.crawler.config;
+
+// TODO：在整个程序启动的时候，需要检查各个概率之和是否为1
+public class PixivCrawlerConfig {
+    // VPN 端口号
+    public static final int PORT = 7897;
+    // 用户p站的cookie，用于绕过反爬
+    public static final String COOKIE = "";
+    // 起始图片 id
+    public static final String START_PID = "127455493";
+
+    // 各队列的选取倾向概率
+    public static final double TOP1W_SELECTION_PROBABILITY = 0.5;
+    public static final double TOP5K_SELECTION_PROBABILITY = 0.3;
+    public static final double TOP3K_SELECTION_PROBABILITY = 0.2;
+
+    // 搜索深度
+    public static final int MAX_DEPTH = 4;
+    // 每轮选择的起始图片数量
+    public static final int START_IMAGES_PER_ROUND = 3;
+    // 队列满时的处理阈值
+    public static final int QUEUE_PROCESS_THRESHOLD = 10;
+    
+    // 基础下载路径
+    public static final String BASE_SAVE_PATH = "downloads";
+    // 日榜图片基础下载路径（不包含周文件夹）
+    public static final String RANKING_BASE_PATH = BASE_SAVE_PATH + "/ranking";
+    // 相关推荐图片基础下载路径（不包含日期和收藏数文件夹）
+    public static final String RECOMMENDATIONS_BASE_PATH = BASE_SAVE_PATH + "/recommendations";
+    // 相关推荐图片按收藏数分类的文件夹名称
+    public static final String TOP1W_FOLDER = "1w+";
+    public static final String TOP5K_FOLDER = "5k-1w";
+    public static final String TOP3K_FOLDER = "3k-5k";
+}
