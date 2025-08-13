@@ -11,7 +11,6 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.util.concurrent.TimeUnit;
 
-
 public class ImageDownloader {
     /**
      * 下载图片到本地
@@ -51,14 +50,32 @@ public class ImageDownloader {
     }
 
     public static void deleteFile(String funcName){
-        File downloadDir = new File("downloads");
+        deleteFile(funcName, "downloads");
+    }
+
+    /**
+     * 删除指定目录中的.part文件
+     * @param funcName 函数名称（用于日志输出）
+     * @param directoryPath 目录路径
+     */
+    public static void deleteFile(String funcName, String directoryPath){
+        File downloadDir = new File(directoryPath);
+        if (!downloadDir.exists()) {
+            System.out.println(funcName + " 目录不存在: " + directoryPath);
+            return;
+        }
+        
         File[] partFiles = downloadDir.listFiles((dir, name) -> name.endsWith(".part"));
-        if(partFiles != null){
+        if(partFiles != null && partFiles.length > 0){
             for(File file : partFiles){
                 if(file.delete()){
-                    System.out.println(funcName + " 已删除未完成文件");
+                    System.out.println(funcName + " 已删除未完成文件: " + file.getName());
+                } else {
+                    System.out.println(funcName + " 删除文件失败: " + file.getName());
                 }
             }
+        } else {
+            System.out.println(funcName + " 目录中没有找到.part文件: " + directoryPath);
         }
     }
 

@@ -16,13 +16,14 @@ public class Downloader {
     private Thread[] threads;
     
     /**
-     * 开始多线程下载任务
+     * 开始多线程下载任务（使用默认下载路径）
      * @param images 要下载的图片列表
      * @param threadCount 线程数
      * @param maxDownload 最大下载数量
      * @param taskName 任务名称（用于日志输出）
+     * @param savePath 图片保存地址
      */
-    public void startDownload(List<PixivImage> images, int threadCount, int maxDownload, String taskName) {
+    public void startDownload(List<PixivImage> images, int threadCount, int maxDownload, String taskName, String savePath) {
         if (images == null || images.isEmpty()) {
             System.out.println("【" + taskName + "】图片列表为空，跳过下载");
             return;
@@ -45,7 +46,7 @@ public class Downloader {
                 PixivImage image = queue.poll();
                 if (image == null) break;
                 
-                downloadSingleImage(image, taskName);
+                downloadSingleImage(image, taskName, savePath);
                 
                 // 检查停止标记
                 if (stopFlag || Thread.currentThread().isInterrupted()) {
@@ -87,9 +88,16 @@ public class Downloader {
      * 下载单张图片
      * @param image 图片信息
      * @param taskName 任务名称
+     * @param savePath 保存路径
      */
-    private void downloadSingleImage(PixivImage image, String taskName) {
-        String basePath = "downloads/" + image.getId();
+    private void downloadSingleImage(PixivImage image, String taskName, String savePath) {
+        // 确保下载目录存在
+        File saveDir = new File(savePath);
+        if (!saveDir.exists()) {
+            saveDir.mkdirs();
+        }
+        
+        String basePath = savePath + "/" + image.getId();
         String jpgPath = basePath + ".jpg";
         String pngPath = basePath + ".png";
         String url = image.getUrl();
