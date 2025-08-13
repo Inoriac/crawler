@@ -2,6 +2,7 @@ package com.pixiv.crawler.service;
 
 import com.pixiv.crawler.config.PixivCrawlerConfig;
 import com.pixiv.crawler.main.Main;
+import com.pixiv.crawler.util.DateUtils;
 import com.pixiv.crawler.util.Downloader;
 import com.pixiv.crawler.util.ImageDownloader;
 import com.pixiv.crawler.util.PixivRecHelper;
@@ -11,6 +12,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import com.pixiv.crawler.model.PixivImage;
 
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.util.*;
@@ -78,9 +80,16 @@ public class PixivCrawler {
             images.add(image);
         }
 
+        // 获取当前周的文件夹名称
+        String weekFolderName = DateUtils.getCurrentWeekFolderName();
+        String rankingSavePath = PixivCrawlerConfig.RANKING_BASE_PATH + "/" + weekFolderName;
+        
+        System.out.println("【日榜下载】当前周文件夹: " + weekFolderName);
+        System.out.println("【日榜下载】完整下载路径: " + rankingSavePath);
+        
         // 记录下载路径
-        addDownloadPath(PixivCrawlerConfig.RANKING_SAVE_PATH);
-        downloader.startDownload(images, 2, 5, "日榜爬取", PixivCrawlerConfig.RANKING_SAVE_PATH);
+        addDownloadPath(rankingSavePath);
+        downloader.startDownload(images, 2, 5, "日榜爬取", rankingSavePath);
     }
 
     /**
@@ -197,10 +206,13 @@ public class PixivCrawler {
             // 转换为 list 以便按索引访问
             List<PixivImage> queueList = new ArrayList<>(queue);
 
+            // 根据tag确定下载路径
+            String savePath = getRecommendationsSavePath(tag);
+            
             // 记录下载路径
-            addDownloadPath(PixivCrawlerConfig.RECOMMENDATIONS_SAVE_PATH);
+            addDownloadPath(savePath);
             // 使用下载器进行多线程下载
-            downloader.startDownload(queueList, 2, queueList.size(), "相关推荐-" + tag, PixivCrawlerConfig.RECOMMENDATIONS_SAVE_PATH);
+            downloader.startDownload(queueList, 2, queueList.size(), "相关推荐-" + tag, savePath);
             
             // 清空队列
             queue.clear();
@@ -213,10 +225,13 @@ public class PixivCrawler {
             System.out.println("【" + tag + "】提交剩余" + queue.size() + "张图片的下载任务...");
             List<PixivImage> queueList = new ArrayList<>(queue);
             
+            // 根据tag确定下载路径
+            String savePath = getRecommendationsSavePath(tag);
+            
             // 记录下载路径
-            addDownloadPath(PixivCrawlerConfig.RECOMMENDATIONS_SAVE_PATH);
+            addDownloadPath(savePath);
             // 使用下载器进行多线程下载
-            downloader.startDownload(queueList, 2, queueList.size(), "下载-" + tag, PixivCrawlerConfig.RECOMMENDATIONS_SAVE_PATH);
+            downloader.startDownload(queueList, 2, queueList.size(), "下载-" + tag, savePath);
         }
     }
 
@@ -352,10 +367,43 @@ public class PixivCrawler {
     }
     
     /**
+     * 根据收藏数标签获取相关推荐的下载路径
+     * @param tag 收藏数标签（"1w+", "5k~1w", "3k~5k"）
+     * @return 对应的下载路径
+     */
+    private String getRecommendationsSavePath(String tag) {
+        // 获取当前日期作为文件夹名称
+        String currentDate = DateUtils.getCurrentDate();
+        
+        String folderName;
+        switch (tag) {
+            case "1w+":
+                folderName = PixivCrawlerConfig.TOP1W_FOLDER;
+                break;
+            case "5k~1w":
+                folderName = PixivCrawlerConfig.TOP5K_FOLDER;
+                break;
+            case "3k~5k":
+                folderName = PixivCrawlerConfig.TOP3K_FOLDER;
+                break;
+            default:
+                folderName = "unknown";
+                System.out.println("【警告】未知的收藏数标签: " + tag + "，使用默认文件夹");
+        }
+        
+        // 构建路径：基础路径/日期/收藏数文件夹
+        String savePath = PixivCrawlerConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
+        System.out.println("【相关推荐】" + tag + " 收藏数图片下载到: " + savePath);
+        return savePath;
+    }
+    
+    /**
      * 清理所有下载路径中的.part文件
      */
     public static void cleanupAllDownloadPaths() {
         System.out.println("【清理】开始清理所有下载路径中的.part文件...");
+        
+        // 1. 清理已记录的路径
         for (String path : downloadPaths) {
             try {
                 ImageDownloader.deleteFile("【清理-" + path + "】", path);
@@ -364,6 +412,74 @@ public class PixivCrawler {
                 System.out.println("【清理】清理路径 " + path + " 时出错: " + e.getMessage());
             }
         }
+        
+        // 2. 清理相关推荐的基础路径（按日期和收藏数分类）
+        cleanupRecommendationsPaths();
+        
         System.out.println("【清理】所有下载路径清理完成");
+    }
+    
+    /**
+     * 清理相关推荐路径中的所有.part文件
+     */
+    private static void cleanupRecommendationsPaths() {
+        try {
+            String currentDate = DateUtils.getCurrentDate();
+            String recommendationsBasePath = PixivCrawlerConfig.RECOMMENDATIONS_BASE_PATH;
+            
+            // 清理当前日期的相关推荐路径
+            String[] folderNames = {
+                PixivCrawlerConfig.TOP1W_FOLDER,
+                PixivCrawlerConfig.TOP5K_FOLDER,
+                PixivCrawlerConfig.TOP3K_FOLDER
+            };
+            
+            for (String folderName : folderNames) {
+                String fullPath = recommendationsBasePath + "/" + currentDate + "/" + folderName;
+                try {
+                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "】", fullPath);
+                    System.out.println("【清理】已清理相关推荐路径: " + fullPath);
+                } catch (Exception e) {
+                    System.out.println("【清理】清理相关推荐路径 " + fullPath + " 时出错: " + e.getMessage());
+                }
+            }
+            
+            // 3. 额外清理：扫描整个相关推荐目录，清理所有.part文件
+            cleanupAllPartFilesInDirectory(recommendationsBasePath);
+            
+        } catch (Exception e) {
+            System.out.println("【清理】清理相关推荐路径时出错: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 递归清理指定目录及其子目录中的所有.part文件
+     */
+    private static void cleanupAllPartFilesInDirectory(String directoryPath) {
+        try {
+            File directory = new File(directoryPath);
+            if (!directory.exists() || !directory.isDirectory()) {
+                return;
+            }
+            
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        // 递归清理子目录
+                        cleanupAllPartFilesInDirectory(file.getAbsolutePath());
+                    } else if (file.getName().endsWith(".part")) {
+                        // 删除.part文件
+                        if (file.delete()) {
+                            System.out.println("【清理】删除.part文件: " + file.getAbsolutePath());
+                        } else {
+                            System.out.println("【清理】删除.part文件失败: " + file.getAbsolutePath());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("【清理】递归清理目录 " + directoryPath + " 时出错: " + e.getMessage());
+        }
     }
 }

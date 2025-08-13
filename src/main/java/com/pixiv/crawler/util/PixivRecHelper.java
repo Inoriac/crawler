@@ -157,6 +157,14 @@ public class PixivRecHelper {
         } catch (Exception e) {
             System.out.println("【图片信息】从API获取收藏数失败: " + e.getMessage());
             return 0;
+        } finally {
+            // 添加延迟避免请求过于频繁
+            try {
+                int sleepTime = (int)(Math.random() * 500); // 0-0.5秒随机延迟
+                Thread.sleep(sleepTime);
+            } catch (InterruptedException e) {
+                System.out.println("【图片信息】休眠被中断");
+            }
         }
     }
 

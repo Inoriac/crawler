@@ -8,7 +8,7 @@ public class PixivCrawlerConfig {
     public static final double TOP3K_SELECTION_PROBABILITY = 0.2;
 
     // 起始图片 id
-    public static final String START_PID = "133461036";
+    public static final String START_PID = "123872912";
     // 搜索深度
     public static final int MAX_DEPTH = 4;
     // 每轮选择的起始图片数量
@@ -18,8 +18,12 @@ public class PixivCrawlerConfig {
     
     // 基础下载路径
     public static final String BASE_SAVE_PATH = "downloads";
-    // 日榜图片下载路径
-    public static final String RANKING_SAVE_PATH = BASE_SAVE_PATH + "/ranking";
-    // 相关推荐图片下载路径
-    public static final String RECOMMENDATIONS_SAVE_PATH = BASE_SAVE_PATH + "/recommendations";
+    // 日榜图片基础下载路径（不包含周文件夹）
+    public static final String RANKING_BASE_PATH = BASE_SAVE_PATH + "/ranking";
+    // 相关推荐图片基础下载路径（不包含日期和收藏数文件夹）
+    public static final String RECOMMENDATIONS_BASE_PATH = BASE_SAVE_PATH + "/recommendations";
+    // 相关推荐图片按收藏数分类的文件夹名称
+    public static final String TOP1W_FOLDER = "1w+";
+    public static final String TOP5K_FOLDER = "5k-1w";
+    public static final String TOP3K_FOLDER = "3k-5k";
 }

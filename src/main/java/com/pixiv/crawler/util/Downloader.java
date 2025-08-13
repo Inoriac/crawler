@@ -54,9 +54,11 @@ public class Downloader {
                     break;
                 }
                 
-                // 线程间延迟
+                // 线程间延迟（3-5秒随机）
                 try {
-                    Thread.sleep(2000);
+                    int sleepTime = 3000 + (int)(Math.random() * 2000); // 3000-5000ms
+                    System.out.println("【" + taskName + "-thread】休眠 " + (sleepTime/1000) + " 秒后继续下载...");
+                    Thread.sleep(sleepTime);
                 } catch (InterruptedException e) {
                     System.out.println("【" + taskName + "-thread】线程休眠时被中断，退出下载");
                     break;
