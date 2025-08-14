@@ -20,16 +20,17 @@ public class PixivRecHelper {
      * @param maxImages
      * @return
      */
-    public static List<PixivImage> getRecommendImagesByPid(String pid, int maxImages) throws Exception{
+    public static List<PixivImage> getRecommendImagesByPid(String pid, int maxImages, int port) throws Exception{
         System.out.println("【相关推荐】尝试通过AJAX API获取<" + pid + ">作品的推荐图片...");
 
         List<PixivImage> recommendImages = new ArrayList<>();
 
         // 创建代理对象
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 7897));
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", port));
 
         String ajaxUrl = "https://www.pixiv.net/ajax/illust/" + pid + "/recommend/init";
         String queryParams = "limit=18&lang=zh";
+//        String queryParams = "lang=zh";
 
         System.out.println("【相关推荐】使用推荐API端点: " + ajaxUrl);
 
@@ -63,6 +64,10 @@ public class PixivRecHelper {
             String responseText = response.body().string();
             System.out.println("【相关推荐】AJAX响应长度: " + responseText.length());
             System.out.println("【相关推荐】响应内容类型: " + response.header("Content-Type"));
+
+            // 保存响应到根目录用于检查tag
+            // String filename = "ajax_response_" + pid + "_init.json";
+            // saveResponseToFile(responseText, filename);
 
             // 解析JSON获取推荐图片完整信息
             recommendImages = JsonUtil.parseRecommendImagesFromJson(responseText, maxImages);
@@ -173,11 +178,15 @@ public class PixivRecHelper {
      */
     private static void saveResponseToFile(String response, String filename) {
         try {
+            // 获取项目根目录路径
+            String rootDir = System.getProperty("user.dir");
+            java.nio.file.Path filePath = java.nio.file.Paths.get(rootDir, filename);
+            
             java.nio.file.Files.write(
-                java.nio.file.Paths.get(filename),
+                filePath,
                 response.getBytes("UTF-8")
             );
-            System.out.println("【调试】AJAX响应已保存到文件: " + filename);
+            System.out.println("【调试】AJAX响应已保存到文件: " + filePath.toString());
         } catch (Exception e) {
             System.out.println("【调试】保存AJAX响应文件失败: " + e.getMessage());
         }
@@ -228,7 +237,7 @@ public class PixivRecHelper {
             int bookmarkCount = getBookmarkCountFromApi(pid);
             image.setBookmarkCount(bookmarkCount);
 
-            // TODO: 原图url尚未获取 暂不需要
+            // TODO: 原图url尚未获取
             return image;
 
         } catch (Exception e){

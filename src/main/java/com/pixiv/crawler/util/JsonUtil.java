@@ -187,6 +187,19 @@ public class JsonUtil {
             // 收藏数通过API获取，这里先设为0，后续会更新
             image.setBookmarkCount(0);
 
+            // 解析tags并检测R-18
+            List<String> tags = parseTags(illustObj);
+            image.setTags(tags);
+            
+            // R-18检测：检查第一个标签是否为R-18
+            if (tags != null && !tags.isEmpty()) {
+                String firstTag = tags.get(0);
+                if ("R-18".equals(firstTag) || "R18".equals(firstTag)) {
+                    image.setR18(true);
+                    System.out.println("【R-18检测】作品 " + image.getId() + " 被标记为R-18 (标签: " + firstTag + ")");
+                }
+            }
+
             return image;
 
         } catch (Exception e) {
@@ -194,5 +207,123 @@ public class JsonUtil {
             e.printStackTrace();
             return null;
         }
+    }
+
+
+    
+    /**
+     * 从作品JSON对象中提取tags字段
+     */
+    private static String extractTagsFromIllust(String illustObj) {
+        String[] possibleTagFields = {
+            "\"tags\":", "\"tag\":", "\"tagList\":", "\"tag_list\":",
+            "\"illustTags\":", "\"illust_tags\":", "\"userTags\":", "\"user_tags\":"
+        };
+        
+        for (String tagField : possibleTagFields) {
+            int tagStart = illustObj.indexOf(tagField);
+            if (tagStart != -1) {
+                return extractTagContentFromIllust(illustObj, tagStart + tagField.length());
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * 提取tags字段的内容
+     */
+    private static String extractTagContentFromIllust(String illustObj, int startPos) {
+        int bracketCount = 0;
+        boolean inArray = false;
+        int endPos = startPos;
+        
+        for (int i = startPos; i < illustObj.length(); i++) {
+            char c = illustObj.charAt(i);
+            
+            if (c == '[' && !inArray) {
+                inArray = true;
+                bracketCount = 1;
+            } else if (c == '[' && inArray) {
+                bracketCount++;
+            } else if (c == ']' && inArray) {
+                bracketCount--;
+                if (bracketCount == 0) {
+                    endPos = i;
+                    break;
+                }
+            } else if (c == '{' && !inArray) {
+                inArray = true;
+                bracketCount = 1;
+            } else if (c == '{' && inArray) {
+                bracketCount++;
+            } else if (c == '}' && inArray) {
+                bracketCount--;
+                if (bracketCount == 0) {
+                    endPos = i;
+                    break;
+                }
+            }
+        }
+        
+        if (endPos > startPos) {
+            return illustObj.substring(startPos, endPos + 1);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * 解析作品对象中的tags字段
+     */
+    private static List<String> parseTags(String illustObj) {
+        if (illustObj == null || illustObj.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        try {
+            String tagsContent = extractTagsFromIllust(illustObj);
+            if (tagsContent == null || tagsContent.isEmpty()) {
+                return new ArrayList<>();
+            }
+            
+            return parseTagsArray(tagsContent);
+            
+        } catch (Exception e) {
+            System.out.println("【标签解析】解析tags时发生错误: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * 解析tags数组字符串为List<String>
+     */
+    private static List<String> parseTagsArray(String tagsContent) {
+        List<String> tags = new ArrayList<>();
+        
+        if (tagsContent == null || tagsContent.isEmpty()) {
+            return tags;
+        }
+        
+        // 移除方括号
+        if (tagsContent.startsWith("[") && tagsContent.endsWith("]")) {
+            tagsContent = tagsContent.substring(1, tagsContent.length() - 1);
+        }
+        
+        // 分割标签
+        String[] tagArray = tagsContent.split(",");
+        for (String tag : tagArray) {
+            tag = tag.trim();
+            // 移除引号
+            if ((tag.startsWith("\"") && tag.endsWith("\"")) || 
+                (tag.startsWith("'") && tag.endsWith("'"))) {
+                tag = tag.substring(1, tag.length() - 1);
+            }
+            if (!tag.isEmpty()) {
+                tags.add(tag);
+            }
+        }
+        
+        return tags;
     }
 }

@@ -22,6 +22,7 @@ public class PixivImage {
     private int likeCount;
     @JsonProperty("bookmarkCount")
     private int bookmarkCount;
+    private boolean isR18;
 
     // 构造函数
     public PixivImage() {
@@ -98,5 +99,13 @@ public class PixivImage {
 
     public void setBookmarkCount(int bookmarkCount) {
         this.bookmarkCount = bookmarkCount;
+    }
+
+    public boolean isR18() {
+        return isR18;
+    }
+
+    public void setR18(boolean r18) {
+        isR18 = r18;
     }
 }

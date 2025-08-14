@@ -100,14 +100,16 @@ public class PixivCrawler {
      * @param maxImages 单次最多获取图片数
      */
     public void downloadRecommendImages(String startPid, int maxDepth, int maxImages) throws Exception {
+        // TODO： 此处需要增加统计 各个类别下载多少张，一共下载多少张
         Set<String> visited = new HashSet<>();  // 防止选取同样的图片作为起始
         Queue<String> queue = new LinkedList<>();
         queue.add(startPid);
 
-        // 三个优先队列，按照收藏数降序
+        // 优先队列，按照收藏数降序
         PriorityQueue<PixivImage> top1w = new PriorityQueue<>(Comparator.comparingInt(PixivImage::getBookmarkCount).reversed());
         PriorityQueue<PixivImage> top5k = new PriorityQueue<>(Comparator.comparingInt(PixivImage::getBookmarkCount).reversed());
         PriorityQueue<PixivImage> top3k = new PriorityQueue<>(Comparator.comparingInt(PixivImage::getBookmarkCount).reversed());
+        PriorityQueue<PixivImage> top1k = new PriorityQueue<>(Comparator.comparingInt(PixivImage::getBookmarkCount).reversed());
 
         // 存储所有推荐图片的完整信息，用于后续选择
         Map<String, PixivImage> allRecommendImages = new HashMap<>();
@@ -141,13 +143,15 @@ public class PixivCrawler {
                         top5k.add(image);
                     } else if (fav >= 3000) {
                         top3k.add(image);
+                    } else if (fav >= 1000){
+                        top1k.add(image);
                     } else {
-                        System.out.println("【相关推荐】 收藏数低于3k，已弃用(" + image.getId() + ")");
+                        System.out.println("【相关推荐】 收藏数低于1k，已弃用(" + image.getId() + ")");
                     }
                 }
 
                 // 获取相关推荐图片完整信息
-                List<PixivImage> recImages = PixivRecHelper.getRecommendImagesByPid(pid, 20); // 获取20张推荐图片
+                List<PixivImage> recImages = PixivRecHelper.getRecommendImagesByPid(pid, crawlerConfig.RECOMMEND_MAX_IMAGE, crawlerConfig.PORT); // 获取20张推荐图片
                 System.out.println("【相关推荐】获取到 " + recImages.size() + " 张推荐图片");
                 
                 // 将推荐图片直接添加到对应的队列中，并收集ID用于下一轮
@@ -176,8 +180,11 @@ public class PixivCrawler {
                     } else if (fav >= 3000) {
                         top3k.add(recImage);
                         System.out.println("【分类】" + recImage.getId() + " -> 3k~5k队列 (收藏数: " + fav + ")");
-                    } else {
-                        System.out.println("【分类】" + recImage.getId() + " -> 收藏数低于3k，舍弃 (收藏数: " + fav + ")");
+                    } else if (fav >= 1000) {
+                        top1k.add(recImage);
+                        System.out.println("【分类】" + recImage.getId() + " -> 1k~3k队列 (收藏数: " + fav + ")");
+                    }else {
+                        System.out.println("【分类】" + recImage.getId() + " -> 收藏数低于1k，舍弃 (收藏数: " + fav + ")");
                     }
                 }
             }
@@ -185,6 +192,7 @@ public class PixivCrawler {
             processQueue(top1w, "1w+", nextStartCandidates);
             processQueue(top5k, "5k~1w", nextStartCandidates);
             processQueue(top3k, "3k~5k", nextStartCandidates);
+            processQueue(top1k, "1k~3k", nextStartCandidates);
 
             //为下一层选择三张起始图片
             currentStartImages = selectNextStartImages(nextStartCandidates, visited, allRecommendImages);
@@ -196,6 +204,7 @@ public class PixivCrawler {
         submitQueueDownload(top1w,  "1w+");
         submitQueueDownload(top5k,  "5k~1w");
         submitQueueDownload(top3k,  "3k~5k");
+        submitQueueDownload(top1k,  "1k~3k");
 
     }
 
@@ -203,16 +212,34 @@ public class PixivCrawler {
     private void processQueue(PriorityQueue<PixivImage> queue, String tag, List<String> nextStartCandidates) throws Exception {
         if(queue.size() >= PixivCrawlerConfig.QUEUE_PROCESS_THRESHOLD){
             System.out.println("【" + tag + "】" + "队列满" + PixivCrawlerConfig.QUEUE_PROCESS_THRESHOLD + "，创建下载任务...");
-            // 转换为 list 以便按索引访问
-            List<PixivImage> queueList = new ArrayList<>(queue);
-
-            // 根据tag确定下载路径
-            String savePath = getRecommendationsSavePath(tag);
             
-            // 记录下载路径
-            addDownloadPath(savePath);
-            // 使用下载器进行多线程下载
-            downloader.startDownload(queueList, 2, queueList.size(), "相关推荐-" + tag, savePath);
+            // 分离R-18和非R-18作品
+            List<PixivImage> r18Images = new ArrayList<>();
+            List<PixivImage> normalImages = new ArrayList<>();
+            
+            for (PixivImage image : queue) {
+                if (image.isR18()) {
+                    r18Images.add(image);
+                } else {
+                    normalImages.add(image);
+                }
+            }
+            
+            // 下载非R-18作品到normal文件夹
+            if (!normalImages.isEmpty()) {
+                String normalSavePath = getRecommendationsSavePath(tag, false);
+                addDownloadPath(normalSavePath);
+                downloader.startDownload(normalImages, 2, normalImages.size(), "相关推荐-" + tag + "-普通", normalSavePath);
+            }
+            
+            // 下载R-18作品到r-18文件夹（如果开启R-18下载）
+            if (!r18Images.isEmpty() && PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+                String r18SavePath = getRecommendationsSavePath(tag, true);
+                addDownloadPath(r18SavePath);
+                downloader.startDownload(r18Images, 2, r18Images.size(), "相关推荐-" + tag + "-R18", r18SavePath);
+            } else if (!r18Images.isEmpty() && !PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+                System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
+            }
             
             // 清空队列
             queue.clear();
@@ -223,15 +250,34 @@ public class PixivCrawler {
     private void submitQueueDownload(PriorityQueue<PixivImage> queue, String tag) throws Exception {
         if(!queue.isEmpty()){
             System.out.println("【" + tag + "】提交剩余" + queue.size() + "张图片的下载任务...");
-            List<PixivImage> queueList = new ArrayList<>(queue);
             
-            // 根据tag确定下载路径
-            String savePath = getRecommendationsSavePath(tag);
+            // 分离R-18和非R-18作品
+            List<PixivImage> r18Images = new ArrayList<>();
+            List<PixivImage> normalImages = new ArrayList<>();
             
-            // 记录下载路径
-            addDownloadPath(savePath);
-            // 使用下载器进行多线程下载
-            downloader.startDownload(queueList, 2, queueList.size(), "下载-" + tag, savePath);
+            for (PixivImage image : queue) {
+                if (image.isR18()) {
+                    r18Images.add(image);
+                } else {
+                    normalImages.add(image);
+                }
+            }
+            
+            // 下载非R-18作品到normal文件夹
+            if (!normalImages.isEmpty()) {
+                String normalSavePath = getRecommendationsSavePath(tag, false);
+                addDownloadPath(normalSavePath);
+                downloader.startDownload(normalImages, 2, normalImages.size(), "下载-" + tag + "-普通", normalSavePath);
+            }
+            
+            // 下载R-18作品到r-18文件夹（如果开启R-18下载）
+            if (!r18Images.isEmpty() && PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+                String r18SavePath = getRecommendationsSavePath(tag, true);
+                addDownloadPath(r18SavePath);
+                downloader.startDownload(r18Images, 2, r18Images.size(), "下载-" + tag + "-R18", r18SavePath);
+            } else if (!r18Images.isEmpty() && !PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+                System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
+            }
         }
     }
 
@@ -260,6 +306,7 @@ public class PixivCrawler {
         List<String> top1wCandidates = new ArrayList<>();
         List<String> top5kCandidates = new ArrayList<>();
         List<String> top3kCandidates = new ArrayList<>();
+        List<String> top1kCandidates = new ArrayList<>();
 
         // 从已保存的推荐图片信息中分类
         for (String candidateId : availableCandidates) {
@@ -272,6 +319,8 @@ public class PixivCrawler {
                     top5kCandidates.add(candidateId);
                 } else if (fav >= 3000) {
                     top3kCandidates.add(candidateId);
+                } else if (fav >= 1000) {
+                    top1kCandidates.add(candidateId);
                 }
             } else {
                 // 如果推荐图片信息中没有找到，说明可能是起始图片，需要通过API获取
@@ -283,6 +332,8 @@ public class PixivCrawler {
                         top5kCandidates.add(candidateId);
                     } else if (fav >= 3000) {
                         top3kCandidates.add(candidateId);
+                    } else if (fav >= 1000) {
+                        top1kCandidates.add(candidateId);
                     }
                 } catch (Exception e) {
                     System.out.println("【调试】获取候选图片 " + candidateId + " 收藏数失败: " + e.getMessage());
@@ -293,13 +344,14 @@ public class PixivCrawler {
         System.out.println("【调试】1w+候选: " + top1wCandidates.size() + " 张");
         System.out.println("【调试】5k~1w候选: " + top5kCandidates.size() + " 张");
         System.out.println("【调试】3k~5k候选: " + top3kCandidates.size() + " 张");
+        System.out.println("【调试】1k~3k候选: " + top1kCandidates.size() + " 张");
 
         // 重复选择起始图片
         int selectionAttempts = 0;
         while(selected.size() < PixivCrawlerConfig.START_IMAGES_PER_ROUND && selectionAttempts < 10){ // 添加最大尝试次数防止无限循环
             selectionAttempts++;
             String selectedPid = selectOneImageByProbability(
-                    top1wCandidates, top5kCandidates, top3kCandidates, random);
+                    top1wCandidates, top5kCandidates, top3kCandidates, top1kCandidates, random);
 
             System.out.println("【调试】第" + selectionAttempts + "次选择尝试，结果: " + selectedPid);
 
@@ -320,6 +372,7 @@ public class PixivCrawler {
             List<String> top1wCandidates,
             List<String> top5kCandidates,
             List<String> top3kCandidates,
+            List<String> top1kCandidates,
             Random random) {
 
         double rand =random.nextDouble();
@@ -329,28 +382,37 @@ public class PixivCrawler {
             int index = random.nextInt(top1wCandidates.size());
             return top1wCandidates.get(index);
         } else if (rand >= PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY &&
-                rand < PixivCrawlerConfig.TOP5K_SELECTION_PROBABILITY + PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY &&
+                rand < (PixivCrawlerConfig.TOP5K_SELECTION_PROBABILITY + PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY) &&
                 !top5kCandidates.isEmpty()) {
             // 选择 5k~1w
             int index = random.nextInt(top5kCandidates.size());
             return top5kCandidates.get(index);
-        } else if (rand >= PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY + PixivCrawlerConfig.TOP5K_SELECTION_PROBABILITY &&
+        } else if (rand >= (PixivCrawlerConfig.TOP5K_SELECTION_PROBABILITY + PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY) &&
+                rand < (1 - PixivCrawlerConfig.TOP1K_SELECTION_PROBABILITY) &&
                 !top3kCandidates.isEmpty()){
             // 选择 3k ~ 5k
             int index = random.nextInt(top3kCandidates.size());
             return top3kCandidates.get(index);
+        } else if (rand >= (1 - PixivCrawlerConfig.TOP1K_SELECTION_PROBABILITY) &&
+                !top1kCandidates.isEmpty()){
+            // 选择 1k ~ 3k
+            int index = random.nextInt(top1kCandidates.size());
+            return top1kCandidates.get(index);
         }
 
         // 如果选取到的队列为空，则依次尝试从队列中选择
-        if(!top1wCandidates.isEmpty()){
-            int index = random.nextInt(top1wCandidates.size());
-            return top1wCandidates.get(index);
-        } else if (!top5kCandidates.isEmpty()) {
+        if (!top5kCandidates.isEmpty()) {
             int index = random.nextInt(top5kCandidates.size());
             return top5kCandidates.get(index);
         } else if (!top3kCandidates.isEmpty()) {
             int index = random.nextInt(top3kCandidates.size());
             return top3kCandidates.get(index);
+        } else if (!top1kCandidates.isEmpty()) {
+            int index = random.nextInt(top1kCandidates.size());
+            return top1kCandidates.get(index);
+        } else if(!top1wCandidates.isEmpty()){
+            int index = random.nextInt(top1wCandidates.size());
+            return top1wCandidates.get(index);
         }
 
         // 所有队列为空
@@ -368,7 +430,7 @@ public class PixivCrawler {
     
     /**
      * 根据收藏数标签获取相关推荐的下载路径
-     * @param tag 收藏数标签（"1w+", "5k~1w", "3k~5k"）
+     * @param tag 收藏数标签（"1w+", "5k~1w", "3k~5k", "1k~3k"）
      * @return 对应的下载路径
      */
     private String getRecommendationsSavePath(String tag) {
@@ -386,6 +448,9 @@ public class PixivCrawler {
             case "3k~5k":
                 folderName = PixivCrawlerConfig.TOP3K_FOLDER;
                 break;
+            case "1k~3k":
+                folderName = PixivCrawlerConfig.TOP1K_FOLDER;
+                break;
             default:
                 folderName = "unknown";
                 System.out.println("【警告】未知的收藏数标签: " + tag + "，使用默认文件夹");
@@ -394,6 +459,45 @@ public class PixivCrawler {
         // 构建路径：基础路径/日期/收藏数文件夹
         String savePath = PixivCrawlerConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
         System.out.println("【相关推荐】" + tag + " 收藏数图片下载到: " + savePath);
+        return savePath;
+    }
+    
+    /**
+     * 根据收藏数标签和R-18状态获取相关推荐图片的保存路径
+     */
+    private String getRecommendationsSavePath(String tag, boolean isR18) {
+        // 获取当前日期作为文件夹名称
+        String currentDate = DateUtils.getCurrentDate();
+        
+        String folderName;
+        switch (tag) {
+            case "1w+":
+                folderName = PixivCrawlerConfig.TOP1W_FOLDER;
+                break;
+            case "5k~1w":
+                folderName = PixivCrawlerConfig.TOP5K_FOLDER;
+                break;
+            case "3k~5k":
+                folderName = PixivCrawlerConfig.TOP3K_FOLDER;
+                break;
+            case "1k~3k":
+                folderName = PixivCrawlerConfig.TOP1K_FOLDER;
+                break;
+            default:
+                folderName = "unknown";
+                System.out.println("【警告】未知的收藏数标签: " + tag + "，使用默认文件夹");
+        }
+        
+        // 根据R-18状态添加对应的子文件夹
+        if (isR18) {
+            folderName = folderName + "/" + PixivCrawlerConfig.R18_FOLDER;
+        } else {
+            folderName = folderName + "/" + PixivCrawlerConfig.NORMAL_FOLDER;
+        }
+        
+        // 构建路径：基础路径/日期/收藏数文件夹/normal或r-18
+        String savePath = PixivCrawlerConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
+        System.out.println("【相关推荐】" + tag + (isR18 ? " R-18" : " 普通") + " 图片下载到: " + savePath);
         return savePath;
     }
     
@@ -431,16 +535,27 @@ public class PixivCrawler {
             String[] folderNames = {
                 PixivCrawlerConfig.TOP1W_FOLDER,
                 PixivCrawlerConfig.TOP5K_FOLDER,
-                PixivCrawlerConfig.TOP3K_FOLDER
+                PixivCrawlerConfig.TOP3K_FOLDER,
+                PixivCrawlerConfig.TOP1K_FOLDER
             };
             
             for (String folderName : folderNames) {
-                String fullPath = recommendationsBasePath + "/" + currentDate + "/" + folderName;
+                // 清理normal文件夹
+                String normalPath = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + PixivCrawlerConfig.NORMAL_FOLDER;
                 try {
-                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "】", fullPath);
-                    System.out.println("【清理】已清理相关推荐路径: " + fullPath);
+                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-normal】", normalPath);
+                    System.out.println("【清理】已清理相关推荐normal路径: " + normalPath);
                 } catch (Exception e) {
-                    System.out.println("【清理】清理相关推荐路径 " + fullPath + " 时出错: " + e.getMessage());
+                    System.out.println("【清理】清理相关推荐normal路径 " + normalPath + " 时出错: " + e.getMessage());
+                }
+                
+                // 清理R-18文件夹
+                String r18Path = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + PixivCrawlerConfig.R18_FOLDER;
+                try {
+                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-r18】", r18Path);
+                    System.out.println("【清理】已清理相关推荐r-18路径: " + r18Path);
+                } catch (Exception e) {
+                    System.out.println("【清理】清理相关推荐r-18路径 " + r18Path + " 时出错: " + e.getMessage());
                 }
             }
             
