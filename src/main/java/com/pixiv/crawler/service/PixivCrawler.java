@@ -1,7 +1,6 @@
 package com.pixiv.crawler.service;
 
 import com.pixiv.crawler.config.PixivCrawlerConfig;
-import com.pixiv.crawler.main.Main;
 import com.pixiv.crawler.util.DateUtils;
 import com.pixiv.crawler.util.Downloader;
 import com.pixiv.crawler.util.ImageDownloader;

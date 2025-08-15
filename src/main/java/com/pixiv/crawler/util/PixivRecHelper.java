@@ -3,8 +3,6 @@ package com.pixiv.crawler.util;
 import com.pixiv.crawler.model.PixivImage;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -30,7 +28,6 @@ public class PixivRecHelper {
 
         String ajaxUrl = "https://www.pixiv.net/ajax/illust/" + pid + "/recommend/init";
         String queryParams = "limit=18&lang=zh";
-//        String queryParams = "lang=zh";
 
         System.out.println("【相关推荐】使用推荐API端点: " + ajaxUrl);
 
@@ -120,11 +117,8 @@ public class PixivRecHelper {
             }
             
             String responseText = response.body().string();
-            
-            // 从JSON中提取收藏数
-            // 尝试查找可能的收藏数字段
-            
-            // 查找 "totalBookmarks": 数字 的模式
+
+            // 查找收藏数字段
             java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\"totalBookmarks\"\\s*:\\s*(\\d+)");
             java.util.regex.Matcher matcher = pattern.matcher(responseText);
             
