@@ -19,6 +19,11 @@
 - 概率控制下载分布
 - 递归爬取，最大深度可配置
 
+### 3. 内容过滤功能
+- **R-18 内容控制**：可配置是否下载 R-18 作品
+- **漫画作品排除**：可配置是否排除包含"漫画"标签的作品
+- 自动分类保存到不同文件夹
+
 ## 项目结构
 
 ```
@@ -86,6 +91,21 @@ public static final String RECOMMENDATIONS_BASE_PATH = BASE_SAVE_PATH + "/recomm
 public static final String TOP1W_FOLDER = "1w+";
 public static final String TOP5K_FOLDER = "5k-1w";
 public static final String TOP3K_FOLDER = "3k-5k";
+```
+
+#### 内容过滤配置
+```java
+// R-18下载开关
+public static final boolean R18_DOWNLOAD_ENABLED = true;
+// R-18作品文件夹名称
+public static final String R18_FOLDER = "r-18";
+// 普通作品文件夹名称
+public static final String NORMAL_FOLDER = "normal";
+
+// 漫画排除开关
+public static final boolean MANGA_EXCLUDE_ENABLED = true;
+// 漫画标签关键词
+public static final String MANGA_TAG_KEYWORD = "漫画";
 ```
 
 ## 使用方法
@@ -194,6 +214,48 @@ downloads/recommendations/
 - **Commons IO** (2.15.1) - 文件操作
 - **SLF4J** (2.0.9) - 日志记录
 
+## 漫画排除功能
+
+### 功能概述
+新增的漫画排除功能可以自动识别并排除包含"漫画"标签的作品，避免下载漫画类型的内容。
+
+### 工作原理
+1. **标签检测**：在解析 AJAX JSON 响应时，检查作品的 `tags` 字段
+2. **关键词匹配**：如果标签中包含"漫画"关键词，则标记为漫画作品
+3. **排除处理**：在下载过程中自动跳过漫画作品
+
+### 应用范围
+- **相关推荐算法**：在推荐图片分类和下载时排除漫画作品
+- **日榜爬取**：在日榜图片下载时排除漫画作品（需要额外API调用）
+
+### 配置选项
+- `MANGA_EXCLUDE_ENABLED`：控制是否启用漫画排除功能
+- `MANGA_TAG_KEYWORD`：设置漫画标签的关键词（默认为"漫画"）
+
+### 日志输出
+程序运行时会输出漫画检测和排除的详细信息：
+
+**相关推荐算法：**
+```
+【漫画检测】作品 123456 被标记为漫画 (标签: 漫画)
+【分类】123456 -> 漫画作品，已排除 (收藏数: 5000)
+【1w+】排除2个漫画作品的下载（漫画排除已启用）
+```
+
+**日榜爬取：**
+```
+【日榜】作品 123456 为漫画作品，已排除
+【日榜】总共解析到 50 个作品
+【日榜】排除 3 个漫画作品（漫画排除已启用）
+【日榜】实际下载 47 个作品
+```
+
+### 测试验证
+可以通过运行测试来验证漫画检测功能：
+```bash
+mvn test -Dtest=PixivRecHelperTest#testMangaTagDetection
+```
+
 ## 注意事项
 
 1. **合规使用**：请遵守 Pixiv 的使用条款和爬虫协议
@@ -201,6 +263,7 @@ downloads/recommendations/
 3. **版权保护**：下载的图片仅供个人学习使用，请勿用于商业用途
 4. **网络稳定**：确保网络连接稳定，代理配置正确
 5. **存储空间**：注意磁盘空间，及时清理不需要的文件
+6. **内容过滤**：R-18 和漫画排除功能可以独立配置
 
 ## 故障排除
 

@@ -4,6 +4,7 @@ import com.pixiv.crawler.config.PixivCrawlerConfig;
 import com.pixiv.crawler.util.DateUtils;
 import com.pixiv.crawler.util.Downloader;
 import com.pixiv.crawler.util.ImageDownloader;
+import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.util.PixivRecHelper;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -23,7 +24,6 @@ import java.util.stream.Collectors;
 public class PixivCrawler {
     private static final String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";
     private Downloader downloader;
-    private PixivCrawlerConfig crawlerConfig;
     
     // 记录所有提交了下载任务的保存路径，用于程序结束时清理.part文件
     private static Set<String> downloadPaths = new HashSet<>();
@@ -35,15 +35,16 @@ public class PixivCrawler {
     // 获取并下载 Pixiv 日榜图片
     public void fetchRankingImages() throws Exception {
         List<PixivImage> images = new ArrayList<>();
+        List<PixivImage> mangaImages = new ArrayList<>();
         // 创建代理对象
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 7897));
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", PixivCrawlerConfig.PORT));
 
         System.out.println("尝试访问排行榜页面...");
 
         // 访问 Pixiv 排行榜页面
         Document document = Jsoup.connect(PIXIV_RANKING_URL)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
-                .header("Cookie", crawlerConfig.COOKIE)
+                .header("Cookie", PixivCrawlerConfig.COOKIE)
                 .proxy(proxy)
                 .get();
 
@@ -76,7 +77,35 @@ public class PixivCrawler {
                 image.setUrl(originalUrl);
             }
 
+            // 检查是否为漫画作品（通过API获取tags信息）
+            if (PixivCrawlerConfig.MANGA_EXCLUDE_ENABLED) {
+                try {
+                    // 使用JsonUtil中的通用方法获取作品的详细信息，包括tags
+                    PixivImage detailedImage = JsonUtil.getImageInfoById(id);
+                    if (detailedImage != null) {
+                        // 检查是否为漫画作品
+                        if (detailedImage.isManga()) {
+                            mangaImages.add(image);
+                            System.out.println("【日榜】作品 " + id + " 为漫画作品，已排除");
+                            continue;
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("【日榜】获取作品 " + id + " 详细信息失败: " + e.getMessage());
+                    // 如果获取详细信息失败，仍然添加到下载列表
+                }
+            }
+
             images.add(image);
+        }
+
+        // 输出统计信息
+        if (PixivCrawlerConfig.MANGA_EXCLUDE_ENABLED) {
+            System.out.println("【日榜】总共解析到 " + (images.size() + mangaImages.size()) + " 个作品");
+            System.out.println("【日榜】排除 " + mangaImages.size() + " 个漫画作品（漫画排除已启用）");
+            System.out.println("【日榜】实际下载 " + images.size() + " 个作品");
+        } else {
+            System.out.println("【日榜】总共解析到 " + images.size() + " 个作品（漫画排除已禁用）");
         }
 
         // 获取当前周的文件夹名称
@@ -130,11 +159,17 @@ public class PixivCrawler {
                 visited.add(pid);
 
                 // 获取图片详情页
-                PixivImage image = PixivRecHelper.getImageInfoById(pid);
+                PixivImage image = JsonUtil.getImageInfoById(pid);
                 if (image == null) continue;
 
                 // 仅 depth=0 时需要进行一次分类
                 if(depth == 0){
+                    // 排除漫画作品
+                    if (image.isManga()) {
+                        System.out.println("【相关推荐】起始图片 " + image.getId() + " 为漫画作品，已排除");
+                        continue;
+                    }
+                    
                     int fav = image.getBookmarkCount();
                     if (fav >= 10000) {
                         top1w.add(image);
@@ -150,7 +185,7 @@ public class PixivCrawler {
                 }
 
                 // 获取相关推荐图片完整信息
-                List<PixivImage> recImages = PixivRecHelper.getRecommendImagesByPid(pid, crawlerConfig.RECOMMEND_MAX_IMAGE, crawlerConfig.PORT); // 获取20张推荐图片
+                List<PixivImage> recImages = PixivRecHelper.getRecommendImagesByPid(pid, PixivCrawlerConfig.RECOMMEND_MAX_IMAGE, PixivCrawlerConfig.PORT); // 获取20张推荐图片
                 System.out.println("【相关推荐】获取到 " + recImages.size() + " 张推荐图片");
                 
                 // 将推荐图片直接添加到对应的队列中，并收集ID用于下一轮
@@ -168,7 +203,12 @@ public class PixivCrawler {
                         recImage.setBookmarkCount(0);
                     }
                     
-                    // 直接分类推荐图片到对应队列
+                    // 直接分类推荐图片到对应队列（排除漫画作品）
+                    if (recImage.isManga()) {
+                        System.out.println("【分类】" + recImage.getId() + " -> 漫画作品，已排除 (收藏数: " + recImage.getBookmarkCount() + ")");
+                        continue;
+                    }
+                    
                     int fav = recImage.getBookmarkCount();
                     if (fav >= 10000) {
                         top1w.add(recImage);
@@ -212,16 +252,24 @@ public class PixivCrawler {
         if(queue.size() >= PixivCrawlerConfig.QUEUE_PROCESS_THRESHOLD){
             System.out.println("【" + tag + "】" + "队列满" + PixivCrawlerConfig.QUEUE_PROCESS_THRESHOLD + "，创建下载任务...");
             
-            // 分离R-18和非R-18作品
+            // 分离R-18和非R-18作品，同时排除漫画作品
             List<PixivImage> r18Images = new ArrayList<>();
             List<PixivImage> normalImages = new ArrayList<>();
+            List<PixivImage> mangaImages = new ArrayList<>();
             
             for (PixivImage image : queue) {
-                if (image.isR18()) {
+                if (image.isManga()) {
+                    mangaImages.add(image);
+                } else if (image.isR18()) {
                     r18Images.add(image);
                 } else {
                     normalImages.add(image);
                 }
+            }
+            
+            // 记录漫画作品排除情况
+            if (!mangaImages.isEmpty()) {
+                System.out.println("【" + tag + "】排除" + mangaImages.size() + "个漫画作品的下载（漫画排除已启用）");
             }
             
             // 下载非R-18作品到normal文件夹
@@ -250,16 +298,24 @@ public class PixivCrawler {
         if(!queue.isEmpty()){
             System.out.println("【" + tag + "】提交剩余" + queue.size() + "张图片的下载任务...");
             
-            // 分离R-18和非R-18作品
+            // 分离R-18和非R-18作品，同时排除漫画作品
             List<PixivImage> r18Images = new ArrayList<>();
             List<PixivImage> normalImages = new ArrayList<>();
+            List<PixivImage> mangaImages = new ArrayList<>();
             
             for (PixivImage image : queue) {
-                if (image.isR18()) {
+                if (image.isManga()) {
+                    mangaImages.add(image);
+                } else if (image.isR18()) {
                     r18Images.add(image);
                 } else {
                     normalImages.add(image);
                 }
+            }
+            
+            // 记录漫画作品排除情况
+            if (!mangaImages.isEmpty()) {
+                System.out.println("【" + tag + "】排除" + mangaImages.size() + "个漫画作品的下载（漫画排除已启用）");
             }
             
             // 下载非R-18作品到normal文件夹
@@ -307,10 +363,16 @@ public class PixivCrawler {
         List<String> top3kCandidates = new ArrayList<>();
         List<String> top1kCandidates = new ArrayList<>();
 
-        // 从已保存的推荐图片信息中分类
+        // 从已保存的推荐图片信息中分类（排除漫画作品）
         for (String candidateId : availableCandidates) {
             PixivImage image = allRecommendImages.get(candidateId);
             if (image != null) {
+                // 排除漫画作品
+                if (image.isManga()) {
+                    System.out.println("【调试】候选图片 " + candidateId + " 为漫画作品，已排除");
+                    continue;
+                }
+                
                 int fav = image.getBookmarkCount();
                 if (fav >= 10000) {
                     top1wCandidates.add(candidateId);

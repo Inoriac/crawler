@@ -41,4 +41,9 @@ public class PixivCrawlerConfig {
     public static final String R18_FOLDER = "r-18";
     // 普通作品文件夹名称
     public static final String NORMAL_FOLDER = "normal";
+    
+    // 漫画排除开关
+    public static final boolean MANGA_EXCLUDE_ENABLED = true;
+    // 漫画标签关键词
+    public static final String MANGA_TAG_KEYWORD = "漫画";
 }

@@ -23,6 +23,7 @@ public class PixivImage {
     @JsonProperty("bookmarkCount")
     private int bookmarkCount;
     private boolean isR18;
+    private boolean isManga;
 
     // 构造函数
     public PixivImage() {
@@ -107,5 +108,13 @@ public class PixivImage {
 
     public void setR18(boolean r18) {
         isR18 = r18;
+    }
+    
+    public boolean isManga() {
+        return isManga;
+    }
+
+    public void setManga(boolean manga) {
+        isManga = manga;
     }
 }
