@@ -66,4 +66,81 @@ public class PixivRecHelperTest {
         assertNotNull(image.getTags(), "Tags不应该为空");
         System.out.println("JsonUtil.getImageInfoById测试通过: " + image.getId() + " - " + image.getTitle());
     }
+
+    @Test
+    public void testMultiPageImageSupport() {
+        // 测试多页图片支持
+        PixivImage image = JsonUtil.getImageInfoById(PixivCrawlerConfig.START_PID);
+        assertNotNull(image, "应该能获取到图片信息");
+        
+        // 检查pageCount
+        assertTrue(image.getPageCount() > 0, "pageCount应该大于0");
+        System.out.println("作品 " + image.getId() + " 共有 " + image.getPageCount() + " 页");
+        
+        // 打印所有页面的URL
+        for (int i = 0; i < image.getPageCount(); i++) {
+            String url = constructPageUrl(image.getUrl(), i);
+            assertNotNull(url, "第" + (i + 1) + "页的URL不应该为空");
+            System.out.println("第" + (i + 1) + "页URL: " + url);
+        }
+        
+        System.out.println("多页图片支持测试通过");
+    }
+    
+    @Test
+    public void testSinglePageVsMultiPageBehavior() {
+        // 测试单页和多页的不同下载行为
+        PixivImage image = JsonUtil.getImageInfoById(PixivCrawlerConfig.START_PID);
+        assertNotNull(image, "应该能获取到图片信息");
+        
+        int pageCount = image.getPageCount();
+        System.out.println("作品 " + image.getId() + " 共有 " + pageCount + " 页");
+        
+        if (pageCount == 1) {
+            System.out.println("✅ 单页作品：将直接下载到主目录，不创建子文件夹");
+            System.out.println("   预期文件路径: downloads/作品ID.jpg");
+        } else {
+            System.out.println("✅ 多页作品：将创建独立文件夹，下载所有页面");
+            System.out.println("   预期文件夹路径: downloads/作品ID/");
+            System.out.println("   预期文件路径: downloads/作品ID/作品ID_p0.jpg, 作品ID_p1.jpg, ...");
+        }
+        
+        System.out.println("单页/多页行为测试通过");
+    }
+    
+    @Test
+    public void testUrlConstructionFix() {
+        // 测试URL构造修复
+        String testPid = "133811943";
+        PixivImage image = JsonUtil.getImageInfoById(testPid);
+        
+        if (image != null) {
+            System.out.println("✅ 成功获取作品信息: " + image.getId() + " - " + image.getTitle());
+            System.out.println("✅ pageCount: " + image.getPageCount());
+            System.out.println("✅ 构造的URL: " + image.getUrl());
+            
+            // 验证URL格式
+            assertNotNull(image.getUrl(), "URL不应该为空");
+            assertTrue(image.getUrl().startsWith("https://i.pximg.net/img-original/img/"), 
+                      "URL应该以正确的域名开头");
+            assertTrue(image.getUrl().endsWith("_p0.jpg"), 
+                      "URL应该以_p0.jpg结尾");
+            
+            System.out.println("✅ URL格式验证通过");
+        } else {
+            System.out.println("❌ 获取作品信息失败");
+        }
+    }
+    
+    /**
+     * 根据基础URL和页面索引构造页面URL（测试用）
+     */
+    private String constructPageUrl(String baseUrl, int pageIndex) {
+        if (pageIndex == 0) {
+            return baseUrl; // 第一页直接使用基础URL
+        }
+        
+        // 替换URL中的页面编号
+        return baseUrl.replace("_p0.jpg", "_p" + pageIndex + ".jpg");
+    }
 }

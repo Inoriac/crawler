@@ -86,7 +86,7 @@ public class Downloader {
     }
     
     /**
-     * 下载单张图片
+     * 下载单张图片（支持多页）
      * @param image 图片信息
      * @param taskName 任务名称
      * @param savePath 保存路径
@@ -98,38 +98,103 @@ public class Downloader {
             saveDir.mkdirs();
         }
         
-        String basePath = savePath + "/" + image.getId();
-        String jpgPath = basePath + ".jpg";
-        String pngPath = basePath + ".png";
-        String url = image.getUrl();
+        int pageCount = image.getPageCount();
+        System.out.println("【" + taskName + "-download】开始下载作品：" + image.getTitle() + " (" + image.getId() + ")，共 " + pageCount + " 页");
         
-        // 检查本地是否已存在
-        File jpgFile = new File(jpgPath);
-        File pngFile = new File(pngPath);
-        if (jpgFile.exists() || pngFile.exists()) {
-            System.out.println("【" + taskName + "-download】已存在，无需重复下载：" + image.getTitle() + " (" + image.getId() + ")");
-            return;
-        }
-        
-        try {
-            ImageDownloader.downloadImage(url, jpgPath);
-            System.out.println("【" + taskName + "-download】已下载：" + image.getTitle() + " -> " + jpgPath);
-        } catch (Exception e) {
-            // 尝试 png
-            if (e.getMessage() != null && e.getMessage().contains("404")) {
-                String pngUrl = url.replace(".jpg", ".png");
-                try {
-                    ImageDownloader.downloadImage(pngUrl, pngPath);
-                    System.out.println("【" + taskName + "-download】已下载：" + image.getTitle() + " -> " + pngPath);
-                } catch (Exception ex) {
-                    System.out.println("【" + taskName + "-download】下载失败：" + image.getTitle() + "，原因：" + ex.getMessage());
-                    System.out.println("图片链接：" + pngUrl);
+        // 如果只有1页，直接下载到主目录，不创建子文件夹
+        if (pageCount == 1) {
+            String basePath = savePath + "/" + image.getId();
+            String jpgPath = basePath + ".jpg";
+            String pngPath = basePath + ".png";
+            
+            // 检查是否已经下载过
+            File jpgFile = new File(jpgPath);
+            File pngFile = new File(pngPath);
+            if (jpgFile.exists() || pngFile.exists()) {
+                System.out.println("【" + taskName + "-download】已存在，无需重复下载：" + image.getTitle() + " (" + image.getId() + ")");
+                return;
+            }
+            
+            try {
+                ImageDownloader.downloadImage(image.getUrl(), jpgPath);
+                System.out.println("【" + taskName + "-download】已下载：" + image.getTitle() + " -> " + jpgPath);
+            } catch (Exception e) {
+                // 尝试 png
+                if (e.getMessage() != null && e.getMessage().contains("404")) {
+                    String pngUrl = image.getUrl().replace(".jpg", ".png");
+                    try {
+                        ImageDownloader.downloadImage(pngUrl, pngPath);
+                        System.out.println("【" + taskName + "-download】已下载：" + image.getTitle() + " -> " + pngPath);
+                    } catch (Exception ex) {
+                        System.out.println("【" + taskName + "-download】下载失败：" + image.getTitle() + "，原因：" + ex.getMessage());
+                        System.out.println("图片链接：" + pngUrl);
+                    }
+                } else {
+                    System.out.println("【" + taskName + "-download】下载失败：" + image.getTitle() + "，原因：" + e.getMessage());
+                    System.out.println("图片链接：" + image.getUrl());
                 }
-            } else {
-                System.out.println("【" + taskName + "-download】下载失败：" + image.getTitle() + "，原因：" + e.getMessage());
-                System.out.println("图片链接：" + url);
+            }
+        } else {
+            // 多页作品，创建独立文件夹
+            String workDir = savePath + "/" + image.getId();
+            File workFolder = new File(workDir);
+            if (!workFolder.exists()) {
+                workFolder.mkdirs();
+            }
+            
+            // 检查是否已经下载过（检查文件夹是否存在且包含文件）
+            if (workFolder.exists() && workFolder.listFiles() != null && workFolder.listFiles().length > 0) {
+                System.out.println("【" + taskName + "-download】已存在，无需重复下载：" + image.getTitle() + " (" + image.getId() + ")");
+                return;
+            }
+            
+            // 下载所有页面
+            for (int i = 0; i < pageCount; i++) {
+                // 构造当前页面的URL
+                String url = constructPageUrl(image.getUrl(), i);
+                
+                String basePath = workDir + "/" + image.getId() + "_p" + i;
+                String jpgPath = basePath + ".jpg";
+                String pngPath = basePath + ".png";
+                
+                try {
+                    ImageDownloader.downloadImage(url, jpgPath);
+                    System.out.println("【" + taskName + "-download】已下载第" + (i + 1) + "页：" + image.getTitle() + " -> " + jpgPath);
+                } catch (Exception e) {
+                    // 尝试 png
+                    if (e.getMessage() != null && e.getMessage().contains("404")) {
+                        String pngUrl = url.replace(".jpg", ".png");
+                        try {
+                            ImageDownloader.downloadImage(pngUrl, pngPath);
+                            System.out.println("【" + taskName + "-download】已下载第" + (i + 1) + "页：" + image.getTitle() + " -> " + pngPath);
+                        } catch (Exception ex) {
+                            System.out.println("【" + taskName + "-download】下载第" + (i + 1) + "页失败：" + image.getTitle() + "，原因：" + ex.getMessage());
+                            System.out.println("图片链接：" + pngUrl);
+                        }
+                    } else {
+                        System.out.println("【" + taskName + "-download】下载第" + (i + 1) + "页失败：" + image.getTitle() + "，原因：" + e.getMessage());
+                        System.out.println("图片链接：" + url);
+                    }
+                }
             }
         }
+        
+        System.out.println("【" + taskName + "-download】作品下载完成：" + image.getTitle() + " (" + image.getId() + ")");
+    }
+    
+    /**
+     * 根据基础URL和页面索引构造页面URL
+     * @param baseUrl 基础URL（通常是p0的URL）
+     * @param pageIndex 页面索引（0, 1, 2, ...）
+     * @return 页面URL
+     */
+    private String constructPageUrl(String baseUrl, int pageIndex) {
+        if (pageIndex == 0) {
+            return baseUrl; // 第一页直接使用基础URL
+        }
+        
+        // 替换URL中的页面编号
+        return baseUrl.replace("_p0.jpg", "_p" + pageIndex + ".jpg");
     }
     
     /**

@@ -5,8 +5,12 @@ import com.pixiv.crawler.model.PixivImage;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class JsonUtil {
     private static final Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", PixivCrawlerConfig.PORT));
@@ -402,8 +406,8 @@ public class JsonUtil {
             // 检测R-18和漫画
             detectContentFlags(tags, image);
             
-            // 构造下载URL
-            constructDownloadUrl(responseText, image);
+            // 提取pageCount并构造下载URL
+            extractPageCountAndConstructUrl(responseText, image);
 
             System.out.println("【JsonUtil】成功获取作品信息: " + pid + " - " + image.getTitle());
             return image;
@@ -498,37 +502,24 @@ public class JsonUtil {
     }
 
     /**
-     * 构造下载URL
+     * 提取pageCount并构造下载URL
      */
-    private static void constructDownloadUrl(String responseText, PixivImage image) {
+    private static void extractPageCountAndConstructUrl(String responseText, PixivImage image) {
         try {
-            // 提取createDate
-            java.util.regex.Pattern datePattern = java.util.regex.Pattern.compile("\"createDate\"\\s*:\\s*\"([^\"]+)\"");
-            java.util.regex.Matcher dateMatcher = datePattern.matcher(responseText);
+            // 提取 pageCount
+            int pageCount = extractPageCount(responseText);
+            image.setPageCount(pageCount);
+            System.out.println("【JsonUtil】作品 " + image.getId() + " 共有 " + pageCount + " 页");
             
-            if (dateMatcher.find()) {
-                String createDate = dateMatcher.group(1);
-                // 使用createDate构造下载URL
-                try {
-                    java.time.ZonedDateTime dateTime = java.time.ZonedDateTime.parse(createDate);
-                    String datePath = String.format("%04d/%02d/%02d/%02d/%02d/%02d",
-                            dateTime.getYear(), dateTime.getMonthValue(), dateTime.getDayOfMonth(),
-                            dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
-
-                    String downloadUrl = "https://i.pximg.net/img-original/img/" + datePath + "/" + image.getId() + "_p0.jpg";
-                    image.setUrl(downloadUrl);
-                    System.out.println("【JsonUtil】构造下载URL: " + downloadUrl);
-                } catch (Exception e) {
-                    // 如果日期解析失败，使用备用URL
-                    String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
-                    image.setUrl(fallbackUrl);
-                    System.out.println("【JsonUtil】日期解析失败，使用备用URL: " + fallbackUrl);
-                }
-            } else {
-                // 如果没有createDate，使用备用URL
-                String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
-                image.setUrl(fallbackUrl);
-                System.out.println("【JsonUtil】无createDate，使用备用URL: " + fallbackUrl);
+            // 从urls.original获取URL
+            Pattern originalUrlPattern = Pattern.compile("\"original\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher originalUrlMatcher = originalUrlPattern.matcher(responseText);
+            
+            if (originalUrlMatcher.find()) {
+                String originalUrl = originalUrlMatcher.group(1);
+                image.setUrl(originalUrl);
+                System.out.println("【JsonUtil】使用原始URL: " + originalUrl);
+                return;
             }
         } catch (Exception e) {
             // 如果构造URL失败，使用备用URL
@@ -536,5 +527,25 @@ public class JsonUtil {
             image.setUrl(fallbackUrl);
             System.out.println("【JsonUtil】构造URL失败，使用备用URL: " + fallbackUrl);
         }
+    }
+    
+    // 提取 pageCount
+    private static int extractPageCount(String responseText) {
+        try {
+            String pattern ="\"pageCount\"\\s*:\\s*(\\d+)";
+
+            Pattern p = java.util.regex.Pattern.compile(pattern);
+            Matcher m = p.matcher(responseText);
+            if (m.find()) {
+                int pageCount = Integer.parseInt(m.group(1));
+                System.out.println("【JsonUtil】提取到pageCount: " + pageCount);
+                return pageCount;
+            }
+
+        } catch (Exception e) {
+            System.out.println("【JsonUtil】提取pageCount失败: " + e.getMessage());
+        }
+        System.out.println("【JsonUtil】未找到pageCount，默认为1页");
+        return 1;
     }
 }

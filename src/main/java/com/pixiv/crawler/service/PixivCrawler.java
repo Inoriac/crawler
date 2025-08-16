@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
  * Pixiv 爬虫
  */
 public class PixivCrawler {
-    private static final String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";
     private Downloader downloader;
     
     // 记录所有提交了下载任务的保存路径，用于程序结束时清理.part文件
@@ -42,7 +41,7 @@ public class PixivCrawler {
         System.out.println("尝试访问排行榜页面...");
 
         // 访问 Pixiv 排行榜页面
-        Document document = Jsoup.connect(PIXIV_RANKING_URL)
+        Document document = Jsoup.connect(PixivCrawlerConfig.PIXIV_RANKING_URL)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
                 .header("Cookie", PixivCrawlerConfig.COOKIE)
                 .proxy(proxy)
@@ -77,26 +76,30 @@ public class PixivCrawler {
                 image.setUrl(originalUrl);
             }
 
-            // 检查是否为漫画作品（通过API获取tags信息）
-            if (PixivCrawlerConfig.MANGA_EXCLUDE_ENABLED) {
-                try {
-                    // 使用JsonUtil中的通用方法获取作品的详细信息，包括tags
-                    PixivImage detailedImage = JsonUtil.getImageInfoById(id);
-                    if (detailedImage != null) {
-                        // 检查是否为漫画作品
-                        if (detailedImage.isManga()) {
-                            mangaImages.add(image);
-                            System.out.println("【日榜】作品 " + id + " 为漫画作品，已排除");
-                            continue;
-                        }
+            // 通过API获取作品的完整信息（包括tags、pageCount等）
+            try {
+                PixivImage detailedImage = JsonUtil.getImageInfoById(id);
+                if (detailedImage != null) {
+                    // 检查是否为漫画作品
+                    if (PixivCrawlerConfig.MANGA_EXCLUDE_ENABLED && detailedImage.isManga()) {
+                        mangaImages.add(detailedImage);
+                        System.out.println("【日榜】作品 " + id + " 为漫画作品，已排除");
+                        continue;
                     }
-                } catch (Exception e) {
-                    System.out.println("【日榜】获取作品 " + id + " 详细信息失败: " + e.getMessage());
-                    // 如果获取详细信息失败，仍然添加到下载列表
+                    
+                    // 使用API获取的完整信息（包含pageCount）
+                    images.add(detailedImage);
+                    System.out.println("【日榜】使用API信息：作品 " + id + " 共 " + detailedImage.getPageCount() + " 页");
+                } else {
+                    // 如果API获取失败，使用HTML解析的基础信息
+                    System.out.println("【日榜】API获取失败，使用HTML解析信息：作品 " + id);
+                    images.add(image);
                 }
+            } catch (Exception e) {
+                System.out.println("【日榜】获取作品 " + id + " 详细信息失败: " + e.getMessage());
+                // 如果获取详细信息失败，使用HTML解析的基础信息
+                images.add(image);
             }
-
-            images.add(image);
         }
 
         // 输出统计信息
@@ -117,7 +120,7 @@ public class PixivCrawler {
         
         // 记录下载路径
         addDownloadPath(rankingSavePath);
-        downloader.startDownload(images, 2, 5, "日榜爬取", rankingSavePath);
+        downloader.startDownload(images, 2, 10, "日榜爬取", rankingSavePath);
     }
 
     /**

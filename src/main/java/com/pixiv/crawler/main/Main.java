@@ -9,7 +9,6 @@ import com.pixiv.crawler.util.ImageDownloader;
 import java.util.List;
 
 // TODO：可以提供下载进度条(待图形化之后考虑加入这个东西)
-// TODO：有关爬日榜的文件保存，按周进行保存，新的一周新建一个文件夹
 public class Main {
     private static volatile boolean stopFlag = false;
     private static Downloader downloader;

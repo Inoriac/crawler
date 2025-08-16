@@ -24,10 +24,13 @@ public class PixivImage {
     private int bookmarkCount;
     private boolean isR18;
     private boolean isManga;
+    @JsonProperty("pageCount")
+    private int pageCount;
 
     // 构造函数
     public PixivImage() {
         this.tags = new ArrayList<>();
+        this.pageCount = 1; // 默认为1页
     }
 
     public PixivImage(String id, String title, String url, List<String> tags, String artist) {
@@ -36,6 +39,7 @@ public class PixivImage {
         this.url = url;
         this.tags = tags != null ? tags : new ArrayList<>();
         this.artist = artist;
+        this.pageCount = 1; // 默认为1页
     }
 
     public String getId() {
@@ -116,5 +120,13 @@ public class PixivImage {
 
     public void setManga(boolean manga) {
         isManga = manga;
+    }
+    
+    public int getPageCount() {
+        return pageCount;
+    }
+
+    public void setPageCount(int pageCount) {
+        this.pageCount = pageCount;
     }
 }
