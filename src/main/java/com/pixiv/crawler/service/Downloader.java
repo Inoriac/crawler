@@ -1,6 +1,9 @@
-package com.pixiv.crawler.util;
+package com.pixiv.crawler.service;
 
+import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.PixivImage;
+import com.pixiv.crawler.model.SavePath;
+import com.pixiv.crawler.util.ImageDownloader;
 
 import java.io.File;
 import java.util.List;
@@ -17,25 +20,24 @@ public class Downloader {
     /**
      * 开始多线程下载任务（使用默认下载路径）
      * @param images 要下载的图片列表
-     * @param threadCount 线程数
-     * @param maxDownload 最大下载数量
      * @param taskName 任务名称（用于日志输出）
      * @param savePath 图片保存地址
      */
-    public void startDownload(List<PixivImage> images, int threadCount, int maxDownload, String taskName, String savePath) {
+    public void startDownload(List<PixivImage> images, String taskName, String savePath) {
         if (images == null || images.isEmpty()) {
             System.out.println("【" + taskName + "】图片列表为空，跳过下载");
             return;
         }
-        
+
+        SavePath.addPath(savePath);
+
         System.out.println("【" + taskName + "】共获取到" + images.size() + "张图片信息...");
         
         // 创建任务队列
         BlockingQueue<PixivImage> queue = new LinkedBlockingQueue<>();
-        
+
         // 将图片添加到队列中
-        int downloadCount = Math.min(maxDownload, images.size());
-        for (int i = 0; i < downloadCount; i++) {
+        for (int i = 0; i < images.size(); i++) {
             queue.offer(images.get(i));
         }
         
@@ -66,8 +68,8 @@ public class Downloader {
         };
         
         // 启动线程
-        threads = new Thread[threadCount];
-        for (int i = 0; i < threadCount; i++) {
+        threads = new Thread[GlobalConfig.THREAD_COUNT];
+        for (int i = 0; i < GlobalConfig.THREAD_COUNT; i++) {
             threads[i] = new Thread(worker, "downloader-" + (i + 1));
             threads[i].start();
         }

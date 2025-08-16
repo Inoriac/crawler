@@ -52,9 +52,9 @@ public class PixivRecHelperTest {
     @Test
     public void testJsonUtilGetImageInfoById() {
         // 测试JsonUtil中的通用方法
-        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.START_PID);
+        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.ARTWORK_START_PID);
         assertNotNull(image, "JsonUtil.getImageInfoById应该返回非空对象");
-        assertEquals(GlobalConfig.START_PID, image.getId(), "图片ID应该正确设置");
+        assertEquals(GlobalConfig.ARTWORK_START_PID, image.getId(), "图片ID应该正确设置");
         assertNotNull(image.getTitle(), "标题不应该为空");
         assertNotNull(image.getArtist(), "作者不应该为空");
         assertNotNull(image.getUrl(), "URL不应该为空");
@@ -65,7 +65,7 @@ public class PixivRecHelperTest {
     @Test
     public void testMultiPageImageSupport() {
         // 测试多页图片支持
-        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.START_PID);
+        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.ARTWORK_START_PID);
         assertNotNull(image, "应该能获取到图片信息");
         
         // 检查pageCount
@@ -85,7 +85,7 @@ public class PixivRecHelperTest {
     @Test
     public void testSinglePageVsMultiPageBehavior() {
         // 测试单页和多页的不同下载行为
-        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.START_PID);
+        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.ARTWORK_START_PID);
         assertNotNull(image, "应该能获取到图片信息");
         
         int pageCount = image.getPageCount();

@@ -1,8 +1,9 @@
-package com.pixiv.crawler.service;
+package com.pixiv.crawler.main;
 
 import com.pixiv.crawler.config.GlobalConfig;
+import com.pixiv.crawler.model.SavePath;
+import com.pixiv.crawler.service.Downloader;
 import com.pixiv.crawler.util.DateUtils;
-import com.pixiv.crawler.util.Downloader;
 import com.pixiv.crawler.util.ImageDownloader;
 import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.util.PixivRecHelper;
@@ -23,15 +24,14 @@ import java.util.stream.Collectors;
  */
 public class PixivCrawler {
     private Downloader downloader;
-    
-    // 记录所有提交了下载任务的保存路径，用于程序结束时清理.part文件
-    private static Set<String> downloadPaths = new HashSet<>();
+    private static final String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";
     
     public PixivCrawler() {
         this.downloader = new Downloader();
     }
 
     // 获取并下载 Pixiv 日榜图片
+    // TODO: 日榜爬取作品数量需要作限制，暂定限制为15个作品，目前尚未实现
     public void fetchRankingImages() throws Exception {
         List<PixivImage> images = new ArrayList<>();
         List<PixivImage> mangaImages = new ArrayList<>();
@@ -41,7 +41,7 @@ public class PixivCrawler {
         System.out.println("尝试访问排行榜页面...");
 
         // 访问 Pixiv 排行榜页面
-        Document document = Jsoup.connect(GlobalConfig.PIXIV_RANKING_URL)
+        Document document = Jsoup.connect(PIXIV_RANKING_URL)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
                 .header("Cookie", GlobalConfig.COOKIE)
                 .proxy(proxy)
@@ -119,8 +119,7 @@ public class PixivCrawler {
         System.out.println("【日榜下载】完整下载路径: " + rankingSavePath);
         
         // 记录下载路径
-        addDownloadPath(rankingSavePath);
-        downloader.startDownload(images, 2, 10, "日榜爬取", rankingSavePath);
+        downloader.startDownload(images, "日榜爬取", rankingSavePath);
     }
 
     /**
@@ -278,15 +277,13 @@ public class PixivCrawler {
             // 下载非R-18作品到normal文件夹
             if (!normalImages.isEmpty()) {
                 String normalSavePath = getRecommendationsSavePath(tag, false);
-                addDownloadPath(normalSavePath);
-                downloader.startDownload(normalImages, 2, normalImages.size(), "相关推荐-" + tag + "-普通", normalSavePath);
+                downloader.startDownload(normalImages,  "相关推荐-" + tag + "-普通", normalSavePath);
             }
             
             // 下载R-18作品到r-18文件夹（如果开启R-18下载）
             if (!r18Images.isEmpty() && GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 String r18SavePath = getRecommendationsSavePath(tag, true);
-                addDownloadPath(r18SavePath);
-                downloader.startDownload(r18Images, 2, r18Images.size(), "相关推荐-" + tag + "-R18", r18SavePath);
+                downloader.startDownload(r18Images, "相关推荐-" + tag + "-R18", r18SavePath);
             } else if (!r18Images.isEmpty() && !GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
             }
@@ -324,15 +321,13 @@ public class PixivCrawler {
             // 下载非R-18作品到normal文件夹
             if (!normalImages.isEmpty()) {
                 String normalSavePath = getRecommendationsSavePath(tag, false);
-                addDownloadPath(normalSavePath);
-                downloader.startDownload(normalImages, 2, normalImages.size(), "下载-" + tag + "-普通", normalSavePath);
+                downloader.startDownload(normalImages, "下载-" + tag + "-普通", normalSavePath);
             }
             
             // 下载R-18作品到r-18文件夹（如果开启R-18下载）
             if (!r18Images.isEmpty() && GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 String r18SavePath = getRecommendationsSavePath(tag, true);
-                addDownloadPath(r18SavePath);
-                downloader.startDownload(r18Images, 2, r18Images.size(), "下载-" + tag + "-R18", r18SavePath);
+                downloader.startDownload(r18Images, "下载-" + tag + "-R18", r18SavePath);
             } else if (!r18Images.isEmpty() && !GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
             }
@@ -412,7 +407,7 @@ public class PixivCrawler {
 
         // 重复选择起始图片
         int selectionAttempts = 0;
-        while(selected.size() < GlobalConfig.START_IMAGES_PER_ROUND && selectionAttempts < 10){ // 添加最大尝试次数防止无限循环
+        while(selected.size() < GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND && selectionAttempts < 10){ // 添加最大尝试次数防止无限循环
             selectionAttempts++;
             String selectedPid = selectOneImageByProbability(
                     top1wCandidates, top5kCandidates, top3kCandidates, top1kCandidates, random);
@@ -481,15 +476,6 @@ public class PixivCrawler {
 
         // 所有队列为空
         return null;
-    }
-    
-    /**
-     * 添加下载路径到记录中
-     * @param savePath 保存路径
-     */
-    private static void addDownloadPath(String savePath) {
-        downloadPaths.add(savePath);
-        System.out.println("【记录】添加下载路径: " + savePath);
     }
     
     /**
@@ -568,97 +554,97 @@ public class PixivCrawler {
     /**
      * 清理所有下载路径中的.part文件
      */
-    public static void cleanupAllDownloadPaths() {
-        System.out.println("【清理】开始清理所有下载路径中的.part文件...");
-        
-        // 1. 清理已记录的路径
-        for (String path : downloadPaths) {
-            try {
-                ImageDownloader.deleteFile("【清理-" + path + "】", path);
-                System.out.println("【清理】已清理路径: " + path);
-            } catch (Exception e) {
-                System.out.println("【清理】清理路径 " + path + " 时出错: " + e.getMessage());
-            }
-        }
-        
-        // 2. 清理相关推荐的基础路径（按日期和收藏数分类）
-        cleanupRecommendationsPaths();
-        
-        System.out.println("【清理】所有下载路径清理完成");
-    }
-    
-    /**
-     * 清理相关推荐路径中的所有.part文件
-     */
-    private static void cleanupRecommendationsPaths() {
-        try {
-            String currentDate = DateUtils.getCurrentDate();
-            String recommendationsBasePath = GlobalConfig.RECOMMENDATIONS_BASE_PATH;
-            
-            // 清理当前日期的相关推荐路径
-            String[] folderNames = {
-                GlobalConfig.TOP1W_FOLDER,
-                GlobalConfig.TOP5K_FOLDER,
-                GlobalConfig.TOP3K_FOLDER,
-                GlobalConfig.TOP1K_FOLDER
-            };
-            
-            for (String folderName : folderNames) {
-                // 清理normal文件夹
-                String normalPath = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + GlobalConfig.NORMAL_FOLDER;
-                try {
-                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-normal】", normalPath);
-                    System.out.println("【清理】已清理相关推荐normal路径: " + normalPath);
-                } catch (Exception e) {
-                    System.out.println("【清理】清理相关推荐normal路径 " + normalPath + " 时出错: " + e.getMessage());
-                }
-                
-                // 清理R-18文件夹
-                String r18Path = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + GlobalConfig.R18_FOLDER;
-                try {
-                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-r18】", r18Path);
-                    System.out.println("【清理】已清理相关推荐r-18路径: " + r18Path);
-                } catch (Exception e) {
-                    System.out.println("【清理】清理相关推荐r-18路径 " + r18Path + " 时出错: " + e.getMessage());
-                }
-            }
-            
-            // 3. 额外清理：扫描整个相关推荐目录，清理所有.part文件
-            cleanupAllPartFilesInDirectory(recommendationsBasePath);
-            
-        } catch (Exception e) {
-            System.out.println("【清理】清理相关推荐路径时出错: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * 递归清理指定目录及其子目录中的所有.part文件
-     */
-    private static void cleanupAllPartFilesInDirectory(String directoryPath) {
-        try {
-            File directory = new File(directoryPath);
-            if (!directory.exists() || !directory.isDirectory()) {
-                return;
-            }
-            
-            File[] files = directory.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isDirectory()) {
-                        // 递归清理子目录
-                        cleanupAllPartFilesInDirectory(file.getAbsolutePath());
-                    } else if (file.getName().endsWith(".part")) {
-                        // 删除.part文件
-                        if (file.delete()) {
-                            System.out.println("【清理】删除.part文件: " + file.getAbsolutePath());
-                        } else {
-                            System.out.println("【清理】删除.part文件失败: " + file.getAbsolutePath());
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("【清理】递归清理目录 " + directoryPath + " 时出错: " + e.getMessage());
-        }
-    }
+//    public static void cleanupAllDownloadPaths() {
+//        System.out.println("【清理】开始清理所有下载路径中的.part文件...");
+//
+//        // 1. 清理已记录的路径
+//        for (String path : downloadPaths) {
+//            try {
+//                ImageDownloader.deleteFile("【清理-" + path + "】", path);
+//                System.out.println("【清理】已清理路径: " + path);
+//            } catch (Exception e) {
+//                System.out.println("【清理】清理路径 " + path + " 时出错: " + e.getMessage());
+//            }
+//        }
+//
+//        // 2. 清理相关推荐的基础路径（按日期和收藏数分类）
+//        cleanupRecommendationsPaths();
+//
+//        System.out.println("【清理】所有下载路径清理完成");
+//    }
+//
+//    /**
+//     * 清理相关推荐路径中的所有.part文件
+//     */
+//    private static void cleanupRecommendationsPaths() {
+//        try {
+//            String currentDate = DateUtils.getCurrentDate();
+//            String recommendationsBasePath = GlobalConfig.RECOMMENDATIONS_BASE_PATH;
+//
+//            // 清理当前日期的相关推荐路径
+//            String[] folderNames = {
+//                GlobalConfig.TOP1W_FOLDER,
+//                GlobalConfig.TOP5K_FOLDER,
+//                GlobalConfig.TOP3K_FOLDER,
+//                GlobalConfig.TOP1K_FOLDER
+//            };
+//
+//            for (String folderName : folderNames) {
+//                // 清理normal文件夹
+//                String normalPath = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + GlobalConfig.NORMAL_FOLDER;
+//                try {
+//                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-normal】", normalPath);
+//                    System.out.println("【清理】已清理相关推荐normal路径: " + normalPath);
+//                } catch (Exception e) {
+//                    System.out.println("【清理】清理相关推荐normal路径 " + normalPath + " 时出错: " + e.getMessage());
+//                }
+//
+//                // 清理R-18文件夹
+//                String r18Path = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + GlobalConfig.R18_FOLDER;
+//                try {
+//                    ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-r18】", r18Path);
+//                    System.out.println("【清理】已清理相关推荐r-18路径: " + r18Path);
+//                } catch (Exception e) {
+//                    System.out.println("【清理】清理相关推荐r-18路径 " + r18Path + " 时出错: " + e.getMessage());
+//                }
+//            }
+//
+//            // 3. 额外清理：扫描整个相关推荐目录，清理所有.part文件
+//            cleanupAllPartFilesInDirectory(recommendationsBasePath);
+//
+//        } catch (Exception e) {
+//            System.out.println("【清理】清理相关推荐路径时出错: " + e.getMessage());
+//        }
+//    }
+//
+//    /**
+//     * 递归清理指定目录及其子目录中的所有.part文件
+//     */
+//    private static void cleanupAllPartFilesInDirectory(String directoryPath) {
+//        try {
+//            File directory = new File(directoryPath);
+//            if (!directory.exists() || !directory.isDirectory()) {
+//                return;
+//            }
+//
+//            File[] files = directory.listFiles();
+//            if (files != null) {
+//                for (File file : files) {
+//                    if (file.isDirectory()) {
+//                        // 递归清理子目录
+//                        cleanupAllPartFilesInDirectory(file.getAbsolutePath());
+//                    } else if (file.getName().endsWith(".part")) {
+//                        // 删除.part文件
+//                        if (file.delete()) {
+//                            System.out.println("【清理】删除.part文件: " + file.getAbsolutePath());
+//                        } else {
+//                            System.out.println("【清理】删除.part文件失败: " + file.getAbsolutePath());
+//                        }
+//                    }
+//                }
+//            }
+//        } catch (Exception e) {
+//            System.out.println("【清理】递归清理目录 " + directoryPath + " 时出错: " + e.getMessage());
+//        }
+//    }
 }

@@ -1,7 +1,8 @@
 package com.pixiv.crawler.main;
 
-import com.pixiv.crawler.service.PixivCrawler;
-import com.pixiv.crawler.util.Downloader;
+import com.pixiv.crawler.config.GlobalConfig;
+import com.pixiv.crawler.model.SavePath;
+import com.pixiv.crawler.service.Downloader;
 
 // TODO：可以提供下载进度条(待图形化之后考虑加入这个东西)
 public class Main {
@@ -18,31 +19,32 @@ public class Main {
             }
 
             // 清理所有下载路径中的.part文件
-            PixivCrawler.cleanupAllDownloadPaths();
+            SavePath.cleanDownloadPaths();
         }));
 
         PixivCrawler crawler = new PixivCrawler();
 
-        try {
-            crawler.fetchRankingImages();
-        } catch (Exception e) {
-            System.out.println("【日榜爬取】爬取或下载过程中出错：" + e.getMessage());
-        }
 //        try {
-//            System.out.println("【相关推荐】开始运行算法...");
-//            System.out.println("起始图片ID: " + PixivCrawlerConfig.START_PID);
-//            System.out.println("最大深度: " + PixivCrawlerConfig.MAX_DEPTH);
-//            System.out.println("每次获取图片数: " + PixivCrawlerConfig.START_IMAGES_PER_ROUND);
-//
-//            crawler.downloadRecommendImages(PixivCrawlerConfig.START_PID,
-//                    PixivCrawlerConfig.MAX_DEPTH,
-//                    PixivCrawlerConfig.START_IMAGES_PER_ROUND);
-//
-//            System.out.println("【相关推荐】算法执行完成");
+//            crawler.fetchRankingImages();
 //        } catch (Exception e) {
-//            System.out.println("【相关推荐】执行过程中出错：" + e.getMessage());
-//            e.printStackTrace();
+//            System.out.println("【日榜爬取】爬取或下载过程中出错：" + e.getMessage());
 //        }
+
+        try {
+            System.out.println("【相关推荐】开始运行算法...");
+            System.out.println("起始图片ID: " + GlobalConfig.ARTWORK_START_PID);
+            System.out.println("最大深度: " + GlobalConfig.MAX_DEPTH);
+            System.out.println("每次获取图片数: " + GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
+
+            crawler.downloadRecommendImages(GlobalConfig.ARTWORK_START_PID,
+                    GlobalConfig.MAX_DEPTH,
+                    GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
+
+            System.out.println("【相关推荐】算法执行完成");
+        } catch (Exception e) {
+            System.out.println("【相关推荐】执行过程中出错：" + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
 }

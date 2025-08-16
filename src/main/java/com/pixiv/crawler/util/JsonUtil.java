@@ -226,27 +226,6 @@ public class JsonUtil {
         }
     }
 
-
-    
-    /**
-     * 从作品JSON对象中提取tags字段
-     */
-    private static String extractTagsFromIllust(String illustObj) {
-        String[] possibleTagFields = {
-            "\"tags\":", "\"tag\":", "\"tagList\":", "\"tag_list\":",
-            "\"illustTags\":", "\"illust_tags\":", "\"userTags\":", "\"user_tags\":"
-        };
-        
-        for (String tagField : possibleTagFields) {
-            int tagStart = illustObj.indexOf(tagField);
-            if (tagStart != -1) {
-                return extractTagContentFromIllust(illustObj, tagStart + tagField.length());
-            }
-        }
-        
-        return null;
-    }
-    
     /**
      * 提取tags字段的内容
      */
@@ -299,49 +278,52 @@ public class JsonUtil {
         }
         
         try {
-            String tagsContent = extractTagsFromIllust(illustObj);
+            // 从json中提取tags字段
+            String tagsContent = "";
+
+            String[] possibleTagFields = {
+                    "\"tags\":", "\"tag\":", "\"tagList\":", "\"tag_list\":",
+                    "\"illustTags\":", "\"illust_tags\":", "\"userTags\":", "\"user_tags\":"
+            };
+
+            for (String tagField : possibleTagFields) {
+                int tagStart = illustObj.indexOf(tagField);
+                if (tagStart != -1) {
+                    tagsContent = extractTagContentFromIllust(illustObj, tagStart + tagField.length());
+                }
+            }
+
             if (tagsContent == null || tagsContent.isEmpty()) {
                 return new ArrayList<>();
             }
-            
-            return parseTagsArray(tagsContent);
+
+            List<String> tags = new ArrayList<>();
+
+            // 移除方括号
+            if (tagsContent.startsWith("[") && tagsContent.endsWith("]")) {
+                tagsContent = tagsContent.substring(1, tagsContent.length() - 1);
+            }
+
+            // 分割标签
+            String[] tagArray = tagsContent.split(",");
+            for (String tag : tagArray) {
+                tag = tag.trim();
+                // 移除引号
+                if ((tag.startsWith("\"") && tag.endsWith("\"")) ||
+                        (tag.startsWith("'") && tag.endsWith("'"))) {
+                    tag = tag.substring(1, tag.length() - 1);
+                }
+                if (!tag.isEmpty()) {
+                    tags.add(tag);
+                }
+            }
+
+            return tags;
             
         } catch (Exception e) {
             System.out.println("【标签解析】解析tags时发生错误: " + e.getMessage());
             return new ArrayList<>();
         }
-    }
-    
-    /**
-     * 解析tags数组字符串为List<String>
-     */
-    private static List<String> parseTagsArray(String tagsContent) {
-        List<String> tags = new ArrayList<>();
-        
-        if (tagsContent == null || tagsContent.isEmpty()) {
-            return tags;
-        }
-        
-        // 移除方括号
-        if (tagsContent.startsWith("[") && tagsContent.endsWith("]")) {
-            tagsContent = tagsContent.substring(1, tagsContent.length() - 1);
-        }
-        
-        // 分割标签
-        String[] tagArray = tagsContent.split(",");
-        for (String tag : tagArray) {
-            tag = tag.trim();
-            // 移除引号
-            if ((tag.startsWith("\"") && tag.endsWith("\"")) || 
-                (tag.startsWith("'") && tag.endsWith("'"))) {
-                tag = tag.substring(1, tag.length() - 1);
-            }
-            if (!tag.isEmpty()) {
-                tags.add(tag);
-            }
-        }
-        
-        return tags;
     }
 
     /**
@@ -532,7 +514,7 @@ public class JsonUtil {
         try {
             String pattern ="\"pageCount\"\\s*:\\s*(\\d+)";
 
-            Pattern p = java.util.regex.Pattern.compile(pattern);
+            Pattern p = Pattern.compile(pattern);
             Matcher m = p.matcher(responseText);
             if (m.find()) {
                 int pageCount = Integer.parseInt(m.group(1));
