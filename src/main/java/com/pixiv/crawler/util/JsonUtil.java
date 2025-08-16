@@ -1,19 +1,17 @@
 package com.pixiv.crawler.util;
 
-import com.pixiv.crawler.config.PixivCrawlerConfig;
+import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.PixivImage;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class JsonUtil {
-    private static final Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", PixivCrawlerConfig.PORT));
+    private static final Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", GlobalConfig.PORT));
 
     /**
      * 从JSON响应中解析推荐图片完整信息

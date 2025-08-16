@@ -1,12 +1,7 @@
 package com.pixiv.crawler.main;
 
-import com.pixiv.crawler.config.PixivCrawlerConfig;
-import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.service.PixivCrawler;
 import com.pixiv.crawler.util.Downloader;
-import com.pixiv.crawler.util.ImageDownloader;
-
-import java.util.List;
 
 // TODO：可以提供下载进度条(待图形化之后考虑加入这个东西)
 public class Main {

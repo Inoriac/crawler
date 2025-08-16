@@ -1,6 +1,6 @@
 package com.pixiv.crawler.util;
 
-import com.pixiv.crawler.config.PixivCrawlerConfig;
+import com.pixiv.crawler.config.GlobalConfig;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -13,7 +13,7 @@ import java.net.Proxy;
 import java.util.concurrent.TimeUnit;
 
 public class ImageDownloader {
-    private static PixivCrawlerConfig crawlerConfig;
+    private static GlobalConfig crawlerConfig;
     /**
      * 下载图片到本地
      * @param imageUrl 图片的 URL

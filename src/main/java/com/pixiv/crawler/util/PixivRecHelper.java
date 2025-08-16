@@ -1,9 +1,7 @@
 package com.pixiv.crawler.util;
 
-import com.pixiv.crawler.config.PixivCrawlerConfig;
+import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.PixivImage;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -13,7 +11,7 @@ import java.util.List;
 public class PixivRecHelper {
     private static final String baseUrl = "https://www.pixiv.net/artworks/";
 
-    private static final Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", PixivCrawlerConfig.PORT));
+    private static final Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", GlobalConfig.PORT));
 
     /**
      * 根据 pid 获取下面相关推荐列表

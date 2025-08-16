@@ -1,6 +1,6 @@
 package com.pixiv.crawler.service;
 
-import com.pixiv.crawler.config.PixivCrawlerConfig;
+import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.util.DateUtils;
 import com.pixiv.crawler.util.Downloader;
 import com.pixiv.crawler.util.ImageDownloader;
@@ -36,14 +36,14 @@ public class PixivCrawler {
         List<PixivImage> images = new ArrayList<>();
         List<PixivImage> mangaImages = new ArrayList<>();
         // 创建代理对象
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", PixivCrawlerConfig.PORT));
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", GlobalConfig.PORT));
 
         System.out.println("尝试访问排行榜页面...");
 
         // 访问 Pixiv 排行榜页面
-        Document document = Jsoup.connect(PixivCrawlerConfig.PIXIV_RANKING_URL)
+        Document document = Jsoup.connect(GlobalConfig.PIXIV_RANKING_URL)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
-                .header("Cookie", PixivCrawlerConfig.COOKIE)
+                .header("Cookie", GlobalConfig.COOKIE)
                 .proxy(proxy)
                 .get();
 
@@ -81,7 +81,7 @@ public class PixivCrawler {
                 PixivImage detailedImage = JsonUtil.getImageInfoById(id);
                 if (detailedImage != null) {
                     // 检查是否为漫画作品
-                    if (PixivCrawlerConfig.MANGA_EXCLUDE_ENABLED && detailedImage.isManga()) {
+                    if (GlobalConfig.MANGA_EXCLUDE_ENABLED && detailedImage.isManga()) {
                         mangaImages.add(detailedImage);
                         System.out.println("【日榜】作品 " + id + " 为漫画作品，已排除");
                         continue;
@@ -103,7 +103,7 @@ public class PixivCrawler {
         }
 
         // 输出统计信息
-        if (PixivCrawlerConfig.MANGA_EXCLUDE_ENABLED) {
+        if (GlobalConfig.MANGA_EXCLUDE_ENABLED) {
             System.out.println("【日榜】总共解析到 " + (images.size() + mangaImages.size()) + " 个作品");
             System.out.println("【日榜】排除 " + mangaImages.size() + " 个漫画作品（漫画排除已启用）");
             System.out.println("【日榜】实际下载 " + images.size() + " 个作品");
@@ -113,7 +113,7 @@ public class PixivCrawler {
 
         // 获取当前周的文件夹名称
         String weekFolderName = DateUtils.getCurrentWeekFolderName();
-        String rankingSavePath = PixivCrawlerConfig.RANKING_BASE_PATH + "/" + weekFolderName;
+        String rankingSavePath = GlobalConfig.RANKING_BASE_PATH + "/" + weekFolderName;
         
         System.out.println("【日榜下载】当前周文件夹: " + weekFolderName);
         System.out.println("【日榜下载】完整下载路径: " + rankingSavePath);
@@ -188,7 +188,7 @@ public class PixivCrawler {
                 }
 
                 // 获取相关推荐图片完整信息
-                List<PixivImage> recImages = PixivRecHelper.getRecommendImagesByPid(pid, PixivCrawlerConfig.RECOMMEND_MAX_IMAGE, PixivCrawlerConfig.PORT); // 获取20张推荐图片
+                List<PixivImage> recImages = PixivRecHelper.getRecommendImagesByPid(pid, GlobalConfig.RECOMMEND_MAX_IMAGE, GlobalConfig.PORT); // 获取20张推荐图片
                 System.out.println("【相关推荐】获取到 " + recImages.size() + " 张推荐图片");
                 
                 // 将推荐图片直接添加到对应的队列中，并收集ID用于下一轮
@@ -252,8 +252,8 @@ public class PixivCrawler {
 
     // 队列满时提交下载任务
     private void processQueue(PriorityQueue<PixivImage> queue, String tag, List<String> nextStartCandidates) throws Exception {
-        if(queue.size() >= PixivCrawlerConfig.QUEUE_PROCESS_THRESHOLD){
-            System.out.println("【" + tag + "】" + "队列满" + PixivCrawlerConfig.QUEUE_PROCESS_THRESHOLD + "，创建下载任务...");
+        if(queue.size() >= GlobalConfig.QUEUE_PROCESS_THRESHOLD){
+            System.out.println("【" + tag + "】" + "队列满" + GlobalConfig.QUEUE_PROCESS_THRESHOLD + "，创建下载任务...");
             
             // 分离R-18和非R-18作品，同时排除漫画作品
             List<PixivImage> r18Images = new ArrayList<>();
@@ -283,11 +283,11 @@ public class PixivCrawler {
             }
             
             // 下载R-18作品到r-18文件夹（如果开启R-18下载）
-            if (!r18Images.isEmpty() && PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+            if (!r18Images.isEmpty() && GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 String r18SavePath = getRecommendationsSavePath(tag, true);
                 addDownloadPath(r18SavePath);
                 downloader.startDownload(r18Images, 2, r18Images.size(), "相关推荐-" + tag + "-R18", r18SavePath);
-            } else if (!r18Images.isEmpty() && !PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+            } else if (!r18Images.isEmpty() && !GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
             }
             
@@ -329,11 +329,11 @@ public class PixivCrawler {
             }
             
             // 下载R-18作品到r-18文件夹（如果开启R-18下载）
-            if (!r18Images.isEmpty() && PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+            if (!r18Images.isEmpty() && GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 String r18SavePath = getRecommendationsSavePath(tag, true);
                 addDownloadPath(r18SavePath);
                 downloader.startDownload(r18Images, 2, r18Images.size(), "下载-" + tag + "-R18", r18SavePath);
-            } else if (!r18Images.isEmpty() && !PixivCrawlerConfig.R18_DOWNLOAD_ENABLED) {
+            } else if (!r18Images.isEmpty() && !GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
             }
         }
@@ -412,7 +412,7 @@ public class PixivCrawler {
 
         // 重复选择起始图片
         int selectionAttempts = 0;
-        while(selected.size() < PixivCrawlerConfig.START_IMAGES_PER_ROUND && selectionAttempts < 10){ // 添加最大尝试次数防止无限循环
+        while(selected.size() < GlobalConfig.START_IMAGES_PER_ROUND && selectionAttempts < 10){ // 添加最大尝试次数防止无限循环
             selectionAttempts++;
             String selectedPid = selectOneImageByProbability(
                     top1wCandidates, top5kCandidates, top3kCandidates, top1kCandidates, random);
@@ -441,23 +441,23 @@ public class PixivCrawler {
 
         double rand =random.nextDouble();
 
-        if(rand < PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY && !top1wCandidates.isEmpty()){
+        if(rand < GlobalConfig.TOP1W_SELECTION_PROBABILITY && !top1wCandidates.isEmpty()){
             // 选择 1w+
             int index = random.nextInt(top1wCandidates.size());
             return top1wCandidates.get(index);
-        } else if (rand >= PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY &&
-                rand < (PixivCrawlerConfig.TOP5K_SELECTION_PROBABILITY + PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY) &&
+        } else if (rand >= GlobalConfig.TOP1W_SELECTION_PROBABILITY &&
+                rand < (GlobalConfig.TOP5K_SELECTION_PROBABILITY + GlobalConfig.TOP1W_SELECTION_PROBABILITY) &&
                 !top5kCandidates.isEmpty()) {
             // 选择 5k~1w
             int index = random.nextInt(top5kCandidates.size());
             return top5kCandidates.get(index);
-        } else if (rand >= (PixivCrawlerConfig.TOP5K_SELECTION_PROBABILITY + PixivCrawlerConfig.TOP1W_SELECTION_PROBABILITY) &&
-                rand < (1 - PixivCrawlerConfig.TOP1K_SELECTION_PROBABILITY) &&
+        } else if (rand >= (GlobalConfig.TOP5K_SELECTION_PROBABILITY + GlobalConfig.TOP1W_SELECTION_PROBABILITY) &&
+                rand < (1 - GlobalConfig.TOP1K_SELECTION_PROBABILITY) &&
                 !top3kCandidates.isEmpty()){
             // 选择 3k ~ 5k
             int index = random.nextInt(top3kCandidates.size());
             return top3kCandidates.get(index);
-        } else if (rand >= (1 - PixivCrawlerConfig.TOP1K_SELECTION_PROBABILITY) &&
+        } else if (rand >= (1 - GlobalConfig.TOP1K_SELECTION_PROBABILITY) &&
                 !top1kCandidates.isEmpty()){
             // 选择 1k ~ 3k
             int index = random.nextInt(top1kCandidates.size());
@@ -504,16 +504,16 @@ public class PixivCrawler {
         String folderName;
         switch (tag) {
             case "1w+":
-                folderName = PixivCrawlerConfig.TOP1W_FOLDER;
+                folderName = GlobalConfig.TOP1W_FOLDER;
                 break;
             case "5k~1w":
-                folderName = PixivCrawlerConfig.TOP5K_FOLDER;
+                folderName = GlobalConfig.TOP5K_FOLDER;
                 break;
             case "3k~5k":
-                folderName = PixivCrawlerConfig.TOP3K_FOLDER;
+                folderName = GlobalConfig.TOP3K_FOLDER;
                 break;
             case "1k~3k":
-                folderName = PixivCrawlerConfig.TOP1K_FOLDER;
+                folderName = GlobalConfig.TOP1K_FOLDER;
                 break;
             default:
                 folderName = "unknown";
@@ -521,7 +521,7 @@ public class PixivCrawler {
         }
         
         // 构建路径：基础路径/日期/收藏数文件夹
-        String savePath = PixivCrawlerConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
+        String savePath = GlobalConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
         System.out.println("【相关推荐】" + tag + " 收藏数图片下载到: " + savePath);
         return savePath;
     }
@@ -536,16 +536,16 @@ public class PixivCrawler {
         String folderName;
         switch (tag) {
             case "1w+":
-                folderName = PixivCrawlerConfig.TOP1W_FOLDER;
+                folderName = GlobalConfig.TOP1W_FOLDER;
                 break;
             case "5k~1w":
-                folderName = PixivCrawlerConfig.TOP5K_FOLDER;
+                folderName = GlobalConfig.TOP5K_FOLDER;
                 break;
             case "3k~5k":
-                folderName = PixivCrawlerConfig.TOP3K_FOLDER;
+                folderName = GlobalConfig.TOP3K_FOLDER;
                 break;
             case "1k~3k":
-                folderName = PixivCrawlerConfig.TOP1K_FOLDER;
+                folderName = GlobalConfig.TOP1K_FOLDER;
                 break;
             default:
                 folderName = "unknown";
@@ -554,13 +554,13 @@ public class PixivCrawler {
         
         // 根据R-18状态添加对应的子文件夹
         if (isR18) {
-            folderName = folderName + "/" + PixivCrawlerConfig.R18_FOLDER;
+            folderName = folderName + "/" + GlobalConfig.R18_FOLDER;
         } else {
-            folderName = folderName + "/" + PixivCrawlerConfig.NORMAL_FOLDER;
+            folderName = folderName + "/" + GlobalConfig.NORMAL_FOLDER;
         }
         
         // 构建路径：基础路径/日期/收藏数文件夹/normal或r-18
-        String savePath = PixivCrawlerConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
+        String savePath = GlobalConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
         System.out.println("【相关推荐】" + tag + (isR18 ? " R-18" : " 普通") + " 图片下载到: " + savePath);
         return savePath;
     }
@@ -593,19 +593,19 @@ public class PixivCrawler {
     private static void cleanupRecommendationsPaths() {
         try {
             String currentDate = DateUtils.getCurrentDate();
-            String recommendationsBasePath = PixivCrawlerConfig.RECOMMENDATIONS_BASE_PATH;
+            String recommendationsBasePath = GlobalConfig.RECOMMENDATIONS_BASE_PATH;
             
             // 清理当前日期的相关推荐路径
             String[] folderNames = {
-                PixivCrawlerConfig.TOP1W_FOLDER,
-                PixivCrawlerConfig.TOP5K_FOLDER,
-                PixivCrawlerConfig.TOP3K_FOLDER,
-                PixivCrawlerConfig.TOP1K_FOLDER
+                GlobalConfig.TOP1W_FOLDER,
+                GlobalConfig.TOP5K_FOLDER,
+                GlobalConfig.TOP3K_FOLDER,
+                GlobalConfig.TOP1K_FOLDER
             };
             
             for (String folderName : folderNames) {
                 // 清理normal文件夹
-                String normalPath = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + PixivCrawlerConfig.NORMAL_FOLDER;
+                String normalPath = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + GlobalConfig.NORMAL_FOLDER;
                 try {
                     ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-normal】", normalPath);
                     System.out.println("【清理】已清理相关推荐normal路径: " + normalPath);
@@ -614,7 +614,7 @@ public class PixivCrawler {
                 }
                 
                 // 清理R-18文件夹
-                String r18Path = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + PixivCrawlerConfig.R18_FOLDER;
+                String r18Path = recommendationsBasePath + "/" + currentDate + "/" + folderName + "/" + GlobalConfig.R18_FOLDER;
                 try {
                     ImageDownloader.deleteFile("【清理相关推荐-" + folderName + "-r18】", r18Path);
                     System.out.println("【清理】已清理相关推荐r-18路径: " + r18Path);

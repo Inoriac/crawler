@@ -1,12 +1,7 @@
-import com.pixiv.crawler.config.PixivCrawlerConfig;
-import com.pixiv.crawler.util.PixivRecHelper;
+import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.model.PixivImage;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -49,17 +44,17 @@ public class PixivRecHelperTest {
     @Test
     public void testMangaExcludeConfig() {
         // 测试配置是否正确
-        assertTrue(PixivCrawlerConfig.MANGA_EXCLUDE_ENABLED, "漫画排除功能应该默认启用");
-        assertEquals("漫画", PixivCrawlerConfig.MANGA_TAG_KEYWORD, "漫画关键词应该正确设置");
+        assertTrue(GlobalConfig.MANGA_EXCLUDE_ENABLED, "漫画排除功能应该默认启用");
+        assertEquals("漫画", GlobalConfig.MANGA_TAG_KEYWORD, "漫画关键词应该正确设置");
         System.out.println("漫画排除配置测试通过");
     }
 
     @Test
     public void testJsonUtilGetImageInfoById() {
         // 测试JsonUtil中的通用方法
-        PixivImage image = JsonUtil.getImageInfoById(PixivCrawlerConfig.START_PID);
+        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.START_PID);
         assertNotNull(image, "JsonUtil.getImageInfoById应该返回非空对象");
-        assertEquals(PixivCrawlerConfig.START_PID, image.getId(), "图片ID应该正确设置");
+        assertEquals(GlobalConfig.START_PID, image.getId(), "图片ID应该正确设置");
         assertNotNull(image.getTitle(), "标题不应该为空");
         assertNotNull(image.getArtist(), "作者不应该为空");
         assertNotNull(image.getUrl(), "URL不应该为空");
@@ -70,7 +65,7 @@ public class PixivRecHelperTest {
     @Test
     public void testMultiPageImageSupport() {
         // 测试多页图片支持
-        PixivImage image = JsonUtil.getImageInfoById(PixivCrawlerConfig.START_PID);
+        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.START_PID);
         assertNotNull(image, "应该能获取到图片信息");
         
         // 检查pageCount
@@ -90,7 +85,7 @@ public class PixivRecHelperTest {
     @Test
     public void testSinglePageVsMultiPageBehavior() {
         // 测试单页和多页的不同下载行为
-        PixivImage image = JsonUtil.getImageInfoById(PixivCrawlerConfig.START_PID);
+        PixivImage image = JsonUtil.getImageInfoById(GlobalConfig.START_PID);
         assertNotNull(image, "应该能获取到图片信息");
         
         int pageCount = image.getPageCount();

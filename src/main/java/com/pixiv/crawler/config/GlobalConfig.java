@@ -1,7 +1,7 @@
 package com.pixiv.crawler.config;
 
 // TODO：在整个程序启动的时候，需要检查各个概率之和是否为1
-public class PixivCrawlerConfig {
+public class GlobalConfig {
     // VPN 端口号
     public static final int PORT = 7897;
     // 用户p站的cookie，用于绕过反爬
