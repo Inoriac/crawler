@@ -253,7 +253,7 @@ downloads/recommendations/
 ### 测试验证
 可以通过运行测试来验证漫画检测功能：
 ```bash
-mvn test -Dtest=PixivRecHelperTest#testMangaTagDetection
+mvn test -Dtest=RecommendUtilTest#testMangaTagDetection
 ```
 
 ## 注意事项

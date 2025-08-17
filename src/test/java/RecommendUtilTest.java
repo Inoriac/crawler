@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class PixivRecHelperTest {
+public class RecommendUtilTest {
 //    @Test
 //    public void testGetImageInfoById(){
 //        System.out.println(PixivRecHelper.getImageInfoById(PixivCrawlerConfig.START_PID));

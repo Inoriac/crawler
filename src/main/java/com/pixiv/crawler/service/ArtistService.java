@@ -12,6 +12,8 @@ import java.net.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ArtistService {
     public List<PixivImage> searchArtworksByArtistId(String artistId, int maxImages) throws Exception{
@@ -161,11 +163,9 @@ public class ArtistService {
         List<String> objects = new ArrayList<>();
         
         // 使用正则表达式匹配作品对象
-        // 格式：数字ID作为键，后面跟着完整的JSON对象
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\"(\\d+)\"\\s*:\\s*\\{");
-        java.util.regex.Matcher matcher = pattern.matcher(illustsContent);
-        
-        int lastEnd = 0;
+        Pattern pattern = Pattern.compile("\"(\\d+)\"\\s*:\\s*\\{");
+        Matcher matcher = pattern.matcher(illustsContent);
+
         while (matcher.find()) {
             int objectStart = matcher.end() - 1; // 回到 { 的位置
             
@@ -244,8 +244,8 @@ public class ArtistService {
             System.out.println("【画师信息】开始解析画师信息JSON，长度: " + jsonResponse.length());
             
             // 查找body.name字段
-            java.util.regex.Pattern namePattern = java.util.regex.Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"");
-            java.util.regex.Matcher nameMatcher = namePattern.matcher(jsonResponse);
+            Pattern namePattern = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher nameMatcher = namePattern.matcher(jsonResponse);
             
             if (nameMatcher.find()) {
                 String artistName = nameMatcher.group(1);
