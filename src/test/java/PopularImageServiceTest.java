@@ -1,15 +1,13 @@
 import com.pixiv.crawler.config.GlobalConfig;
-import com.pixiv.crawler.main.PixivCrawler;
 import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.model.SavePath;
-import com.pixiv.crawler.service.ArtistService;
 import com.pixiv.crawler.service.Downloader;
-import com.pixiv.crawler.util.ImageDownloader;
+import com.pixiv.crawler.service.PopularImageService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-public class ArtistServiceTest {
+public class PopularImageServiceTest {
     private static volatile boolean stopFlag = false;
     private static Downloader downloader = new Downloader();
     @Test
@@ -27,18 +25,18 @@ public class ArtistServiceTest {
             SavePath.cleanDownloadPaths();
         }));
 
-        ArtistService artistService = new ArtistService();
+        PopularImageService popularImageService = new PopularImageService();
 
-        try {
-            List<PixivImage> pixivImages = artistService.searchArtworksByArtistId(GlobalConfig.ARTIST_START_ID, GlobalConfig.ARTIST_MAX_IMAGE);
-            String artistName = artistService.getArtistName(GlobalConfig.ARTIST_START_ID);
+        try{
+            String tag = "スズラン(アークナイツ)";
+            List<PixivImage> popularImages = popularImageService.getPopularImagesByTag(tag);
 
-            String savePath = GlobalConfig.ARTIST_BASE_PATH + "/" + artistName;
-
-            downloader.startDownload(pixivImages, "画师作品", savePath);
-
-        } catch (Exception e) {
+            String savePath = GlobalConfig.POPULAR_BASE_PATH + "/" + tag;
+            downloader.startDownload(popularImages, "热门作品" , savePath);
+        }catch (Exception e){
             throw new RuntimeException(e);
         }
+
+
     }
 }

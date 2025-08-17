@@ -1,7 +1,10 @@
 package com.pixiv.crawler.config;
 
 // TODO：在整个程序启动的时候，需要检查各个概率之和是否为1
+// TODO：可以提供一个排除AI作品的开关(实现思路类似于检测R-18标签)
 public class GlobalConfig {
+    // 默认主机地址
+    public static final String HOST = "127.0.0.1";
     // VPN 端口号
     public static final int PORT = 7897;
     // 用户p站的cookie，用于绕过反爬
@@ -38,6 +41,8 @@ public class GlobalConfig {
     public static final String RECOMMENDATIONS_BASE_PATH = BASE_SAVE_PATH + "/recommendations";
     // 画师作品基础保存路径
     public static final String ARTIST_BASE_PATH = BASE_SAVE_PATH + "/artists";
+    // 热门作品基础保存路径
+    public static final String POPULAR_BASE_PATH = BASE_SAVE_PATH + "/popular";
     // 相关推荐图片按收藏数分类的文件夹名称
     public static final String TOP1W_FOLDER = "1w+";
     public static final String TOP5K_FOLDER = "5k-1w";

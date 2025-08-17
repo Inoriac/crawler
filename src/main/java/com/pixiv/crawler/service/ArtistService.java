@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 
 public class ArtistService {
     public List<PixivImage> searchArtworksByArtistId(String artistId, int maxImages) throws Exception{
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", GlobalConfig.PORT));
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(GlobalConfig.HOST, GlobalConfig.PORT));
 
         String url = "https://www.pixiv.net/ajax/user/" + artistId + "/profile/top?sensitiveFilterMode=userSetting&lang=zh";
         
