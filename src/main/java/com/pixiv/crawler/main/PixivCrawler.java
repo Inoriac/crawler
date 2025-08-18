@@ -28,7 +28,6 @@ public class PixivCrawler {
     }
 
     // 获取并下载 Pixiv 日榜图片
-    // TODO: 日榜爬取作品数量需要作限制，暂定限制为15个作品，目前尚未实现
     public void fetchRankingImages() throws Exception {
         List<PixivImage> images = new ArrayList<>();
         List<PixivImage> mangaImages = new ArrayList<>();
@@ -121,13 +120,11 @@ public class PixivCrawler {
 
     /**
      * 从指定图片ID出发，爬取相关图片，按收藏数分档，并提交下载任务
-     *
      * @param startPid  起始图片 pid
-     * @param maxDepth  最大深度 应该不超过4层
-     * @param maxImages 单次最多获取图片数
      */
-    public void downloadRecommendImages(String startPid, int maxDepth, int maxImages) throws Exception {
+    public void downloadRecommendImages(String startPid, String baseUrl) throws Exception {
         // TODO： 此处需要增加统计 各个类别下载多少张，一共下载多少张
+
         Set<String> visited = new HashSet<>();  // 防止选取同样的图片作为起始
         Queue<String> queue = new LinkedList<>();
         queue.add(startPid);
@@ -146,7 +143,7 @@ public class PixivCrawler {
         currentStartImages.add(startPid);
 
         int depth = 0;
-        while (!queue.isEmpty() && depth < maxDepth) {
+        while (!queue.isEmpty() && depth < GlobalConfig.MAX_DEPTH) {
             System.out.println("【第" + (depth + 1) + "层】开始处理，起始图片数量: " + currentStartImages.size());
 
             // 下一层的起始图片候选
@@ -184,7 +181,7 @@ public class PixivCrawler {
                 }
 
                 // 获取相关推荐图片完整信息
-                List<PixivImage> recImages = RecommendUtil.getRecommendImagesByPid(pid, GlobalConfig.RECOMMEND_MAX_IMAGE, GlobalConfig.PORT); // 获取20张推荐图片
+                List<PixivImage> recImages = RecommendUtil.getRecommendImagesByPid(pid, GlobalConfig.RECOMMEND_MAX_IMAGE); // 获取20张推荐图片
                 System.out.println("【相关推荐】获取到 " + recImages.size() + " 张推荐图片");
                 
                 // 将推荐图片直接添加到对应的队列中，并收集ID用于下一轮
@@ -227,10 +224,10 @@ public class PixivCrawler {
                 }
             }
             // 检查并处理每个队列
-            processQueue(top1w, "1w+", nextStartCandidates);
-            processQueue(top5k, "5k~1w", nextStartCandidates);
-            processQueue(top3k, "3k~5k", nextStartCandidates);
-            processQueue(top1k, "1k~3k", nextStartCandidates);
+            processQueue(top1w, "1w+", baseUrl);
+            processQueue(top5k, "5k~1w", baseUrl);
+            processQueue(top3k, "3k~5k", baseUrl);
+            processQueue(top1k, "1k~3k", baseUrl);
 
             //为下一层选择三张起始图片
             currentStartImages = selectNextStartImages(nextStartCandidates, visited, allRecommendImages);
@@ -239,15 +236,15 @@ public class PixivCrawler {
         }
 
         System.out.println("【算法结束】提交剩余队列的下载任务...");
-        submitQueueDownload(top1w,  "1w+");
-        submitQueueDownload(top5k,  "5k~1w");
-        submitQueueDownload(top3k,  "3k~5k");
-        submitQueueDownload(top1k,  "1k~3k");
+        submitQueueDownload(top1w,  "1w+", baseUrl);
+        submitQueueDownload(top5k,  "5k~1w", baseUrl);
+        submitQueueDownload(top3k,  "3k~5k", baseUrl);
+        submitQueueDownload(top1k,  "1k~3k", baseUrl);
 
     }
 
     // 队列满时提交下载任务
-    private void processQueue(PriorityQueue<PixivImage> queue, String tag, List<String> nextStartCandidates) throws Exception {
+    private void processQueue(PriorityQueue<PixivImage> queue, String tag, String baseUrl) throws Exception {
         if(queue.size() >= GlobalConfig.QUEUE_PROCESS_THRESHOLD){
             System.out.println("【" + tag + "】" + "队列满" + GlobalConfig.QUEUE_PROCESS_THRESHOLD + "，创建下载任务...");
             
@@ -273,13 +270,13 @@ public class PixivCrawler {
             
             // 下载非R-18作品到normal文件夹
             if (!normalImages.isEmpty()) {
-                String normalSavePath = getRecommendationsSavePath(tag, false);
+                String normalSavePath = getRecommendationsSavePath(tag, false, baseUrl);
                 downloader.startDownload(normalImages,  "相关推荐-" + tag + "-普通", normalSavePath);
             }
             
             // 下载R-18作品到r-18文件夹（如果开启R-18下载）
             if (!r18Images.isEmpty() && GlobalConfig.R18_DOWNLOAD_ENABLED) {
-                String r18SavePath = getRecommendationsSavePath(tag, true);
+                String r18SavePath = getRecommendationsSavePath(tag, true, baseUrl);
                 downloader.startDownload(r18Images, "相关推荐-" + tag + "-R18", r18SavePath);
             } else if (!r18Images.isEmpty() && !GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
@@ -291,7 +288,7 @@ public class PixivCrawler {
     }
 
     // 提交队列下载任务(结束时调用)
-    private void submitQueueDownload(PriorityQueue<PixivImage> queue, String tag) throws Exception {
+    private void submitQueueDownload(PriorityQueue<PixivImage> queue, String tag, String baseUrl) throws Exception {
         if(!queue.isEmpty()){
             System.out.println("【" + tag + "】提交剩余" + queue.size() + "张图片的下载任务...");
             
@@ -317,13 +314,13 @@ public class PixivCrawler {
             
             // 下载非R-18作品到normal文件夹
             if (!normalImages.isEmpty()) {
-                String normalSavePath = getRecommendationsSavePath(tag, false);
+                String normalSavePath = getRecommendationsSavePath(tag, false, baseUrl);
                 downloader.startDownload(normalImages, "下载-" + tag + "-普通", normalSavePath);
             }
             
             // 下载R-18作品到r-18文件夹（如果开启R-18下载）
             if (!r18Images.isEmpty() && GlobalConfig.R18_DOWNLOAD_ENABLED) {
-                String r18SavePath = getRecommendationsSavePath(tag, true);
+                String r18SavePath = getRecommendationsSavePath(tag, true, baseUrl);
                 downloader.startDownload(r18Images, "下载-" + tag + "-R18", r18SavePath);
             } else if (!r18Images.isEmpty() && !GlobalConfig.R18_DOWNLOAD_ENABLED) {
                 System.out.println("【" + tag + "】跳过" + r18Images.size() + "个R-18作品的下载（R-18下载已禁用）");
@@ -478,7 +475,7 @@ public class PixivCrawler {
     /**
      * 根据收藏数标签和R-18状态获取相关推荐图片的保存路径
      */
-    private String getRecommendationsSavePath(String tag, boolean isR18) {
+    private String getRecommendationsSavePath(String tag, boolean isR18, String baseUrl) {
         // 获取当前日期作为文件夹名称
         String currentDate = DateUtils.getCurrentDate();
         
@@ -509,7 +506,8 @@ public class PixivCrawler {
         }
         
         // 构建路径：基础路径/日期/收藏数文件夹/normal或r-18
-        String savePath = GlobalConfig.RECOMMENDATIONS_BASE_PATH + "/" + currentDate + "/" + folderName;
+        String savePath = baseUrl + "/" + currentDate + "/" + folderName;
+
         System.out.println("【相关推荐】" + tag + (isR18 ? " R-18" : " 普通") + " 图片下载到: " + savePath);
         return savePath;
     }

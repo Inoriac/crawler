@@ -4,6 +4,8 @@ import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.SavePath;
 import com.pixiv.crawler.service.Downloader;
 
+import java.util.Optional;
+
 // TODO：可以提供下载进度条(待图形化之后考虑加入这个东西)
 public class Main {
     private static volatile boolean stopFlag = false;
@@ -36,9 +38,7 @@ public class Main {
             System.out.println("最大深度: " + GlobalConfig.MAX_DEPTH);
             System.out.println("每次获取图片数: " + GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
 
-            crawler.downloadRecommendImages(GlobalConfig.ARTWORK_START_PID,
-                    GlobalConfig.MAX_DEPTH,
-                    GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
+            crawler.downloadRecommendImages(GlobalConfig.ARTWORK_START_PID, GlobalConfig.RECOMMENDATIONS_BASE_PATH);
 
             System.out.println("【相关推荐】算法执行完成");
         } catch (Exception e) {

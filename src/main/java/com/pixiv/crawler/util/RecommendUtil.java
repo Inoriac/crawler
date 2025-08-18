@@ -27,7 +27,7 @@ public class RecommendUtil {
      * @param maxImages
      * @return
      */
-    public static List<PixivImage> getRecommendImagesByPid(String pid, int maxImages, int port) throws Exception{
+    public static List<PixivImage> getRecommendImagesByPid(String pid, int maxImages) throws Exception{
         System.out.println("【相关推荐】尝试通过AJAX API获取<" + pid + ">作品的推荐图片...");
 
         List<PixivImage> recommendImages = new ArrayList<>();

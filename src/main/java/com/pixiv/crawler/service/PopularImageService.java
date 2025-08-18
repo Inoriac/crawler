@@ -18,7 +18,6 @@ public class PopularImageService {
     public List<PixivImage> getPopularImagesByTag(String tag) throws Exception{
         Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(GlobalConfig.HOST, GlobalConfig.PORT));
 
-        // TODO：目前尚未进行禁止显示AI作品的ajax请求参数适配(可能有所区别)
         String searchUrl = "https://www.pixiv.net/ajax/search/artworks/" + tag + "?word=sea&order=date_d&mode=all&p=1&csw=0&s_mode=s_tag&type=all&lang=zh";
 
         OkHttpClient client = new OkHttpClient.Builder()
@@ -195,11 +194,19 @@ public class PopularImageService {
             System.out.println("【热门作品】" + arrayName + "数组找到 " + illustObjects.size() + " 个作品对象");
 
             for (String illustObj : illustObjects) {
-                // 使用JsonUtil中的parseIllustObject方法
-                PixivImage image = JsonUtil.parseIllustObject(illustObj);
-                if (image != null) {
-                    images.add(image);
-                    System.out.println("【热门作品】解析" + arrayName + "作品: " + image.getId() + " - " + image.getTitle());
+                // 先从JSON对象中提取ID
+                String pid = JsonUtil.extractIdFromIllustObj(illustObj);
+                if (pid != null) {
+                    // 使用JsonUtil中的getImageInfoById方法获取完整信息
+                    PixivImage image = JsonUtil.getImageInfoById(pid);
+                    if (image.getBookmarkCount() >= 500) {
+                        images.add(image);
+                        System.out.println("【热门作品】解析" + arrayName + "作品: " + image.getId() + " - " + image.getTitle());
+                    } else {
+                        System.out.println("【热门作品】收藏数小于500，舍弃");
+                    }
+                } else {
+                    System.out.println("【热门作品】无法从JSON对象中提取ID");
                 }
             }
 

@@ -13,9 +13,7 @@ public class PixivRecommendTest {
             System.out.println("最大深度: " + GlobalConfig.MAX_DEPTH);
             System.out.println("每次获取图片数: " + GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
 
-            crawler.downloadRecommendImages(GlobalConfig.ARTWORK_START_PID,
-                    GlobalConfig.MAX_DEPTH,
-                    GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
+            crawler.downloadRecommendImages(GlobalConfig.ARTWORK_START_PID, GlobalConfig.RECOMMENDATIONS_BASE_PATH);
 
             System.out.println("【相关推荐】算法执行完成");
         } catch (Exception e) {

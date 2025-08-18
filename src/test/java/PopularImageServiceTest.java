@@ -1,4 +1,5 @@
 import com.pixiv.crawler.config.GlobalConfig;
+import com.pixiv.crawler.main.PixivCrawler;
 import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.model.SavePath;
 import com.pixiv.crawler.service.Downloader;
@@ -6,6 +7,7 @@ import com.pixiv.crawler.service.PopularImageService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 public class PopularImageServiceTest {
     private static volatile boolean stopFlag = false;
@@ -26,6 +28,7 @@ public class PopularImageServiceTest {
         }));
 
         PopularImageService popularImageService = new PopularImageService();
+        PixivCrawler pixivCrawler = new PixivCrawler();
 
         try{
             String tag = "スズラン(アークナイツ)";
@@ -33,6 +36,11 @@ public class PopularImageServiceTest {
 
             String savePath = GlobalConfig.POPULAR_BASE_PATH + "/" + tag;
             downloader.startDownload(popularImages, "热门作品" , savePath);
+
+            for (int i = 0; i < popularImages.size(); i++) {
+                pixivCrawler.downloadRecommendImages(popularImages.get(i).getId(), savePath + "/recommend");
+            }
+
         }catch (Exception e){
             throw new RuntimeException(e);
         }

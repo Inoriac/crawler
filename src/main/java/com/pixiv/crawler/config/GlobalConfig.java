@@ -24,6 +24,8 @@ public class GlobalConfig {
     public static final int MAX_DEPTH = 4;
     // 每轮选择的起始图片数量
     public static final int RECOMMEND_START_IMAGES_PER_ROUND = 3;
+    // 每个作品最大下载图片数量
+    public static final int MAX_IMAGES_PER_WORK = 5;
     // 队列满时的处理阈值
     public static final int QUEUE_PROCESS_THRESHOLD = 10;
     // 单轮获取推荐图片数量

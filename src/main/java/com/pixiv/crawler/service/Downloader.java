@@ -13,6 +13,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 /**
  * 多线程图片下载器
  */
+// TODO：文件已在com surrogate中打开 很有可能是下载线程不对，资源未释放，需要进行应对
 public class Downloader {
     private volatile boolean stopFlag = false;
     private Thread[] threads;
