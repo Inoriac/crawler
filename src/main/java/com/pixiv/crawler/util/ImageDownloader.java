@@ -43,6 +43,14 @@ public class ImageDownloader {
             FileUtils.copyInputStreamToFile(inputStream, new File(tempPath));
         }
 
+        // 确保文件流完全关闭后再重命名
+        System.gc(); // 建议垃圾回收器清理资源
+        try {
+            Thread.sleep(100); // 短暂等待确保文件句柄释放
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         // 下载成功后重命名
         File tempFile = new File(tempPath);
         File finalFile = new File(savePath);
