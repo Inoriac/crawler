@@ -1,0 +1,215 @@
+/* ===== 主布局样式 ===== */
+
+/* 顶部功能栏 */
+.top-bar {
+    -fx-background-color: rgba(255, 255, 255, 0.0);
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+/* 左侧面板 */
+.left-panel {
+    -fx-background-color: rgba(255, 255, 255, 0.0);
+}
+
+/* 右侧面板 */
+.right-panel {
+    -fx-background-color: rgba(255, 255, 255, 0.35);
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: rgba(255, 255, 255, 0.5);
+    -fx-border-width: 1;
+    -fx-padding: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0.1, 2, 2);
+}
+
+/* 设置面板 */
+.settings-panel {
+    -fx-background-color: rgba(255, 255, 255, 0.0);
+}
+
+/* ===== TitledPane 样式 ===== */
+
+.custom-titled-pane {
+    -fx-background-color: transparent;
+}
+
+.custom-titled-pane > .title {
+    -fx-background-color: rgba(0,0,0,0.3);
+    -fx-text-fill: black;
+    -fx-font-weight: bold;
+}
+
+.custom-titled-pane > .content {
+    -fx-background-color: rgba(255,255,255,0.2);
+}
+
+/* ===== 日志区域样式 ===== */
+
+/* 日志标签 */
+.log-label {
+    -fx-text-fill: #2c3e50;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 0, 0, 0, 1);
+}
+
+/* 日志区域 */
+.log-area {
+    -fx-control-inner-background: rgba(255, 255, 255, 0.35);
+    -fx-text-fill: #2c3e50;
+    -fx-background-color: transparent;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-border-color: rgba(255, 255, 255, 0.4);
+    -fx-border-width: 0.6;
+}
+
+/* 日志区域的内容区域 */
+.log-area .content {
+    -fx-background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 滚动面板 */
+.log-scroll {
+    -fx-background: transparent ;
+    -fx-background-color: transparent;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-padding: 2;
+}
+
+/* 滚动条样式 */
+.scroll-bar:vertical {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar:vertical .track {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 5;
+}
+
+.scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(255, 255, 255, 0.3);
+    -fx-background-radius: 5;
+}
+
+.scroll-bar:vertical .thumb:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ===== 按钮样式 ===== */
+
+/* 功能按钮 */
+.function-button {
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+/* 设置按钮 */
+.settings-button {
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+}
+
+/* 背景设置按钮 */
+.background-button {
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+/* ===== 标签样式 ===== */
+
+/* 标题标签 */
+.title-label {
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+}
+
+/* 模式标签 */
+.mode-label {
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+/* 设置标题标签 */
+.settings-title-label {
+    -fx-font-size: 20;
+    -fx-font-weight: bold;
+}
+
+/* 设置分组标签 */
+.settings-group-label {
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+/* ===== 输入框样式 ===== */
+
+/* 文本输入框 */
+.text-field {
+    -fx-background-color: rgba(255, 255, 255, 0.8);
+    -fx-text-fill: black;
+}
+
+/* 路径输入框 */
+.path-field {
+    -fx-background-color: rgba(255, 255, 255, 0.8);
+    -fx-text-fill: black;
+}
+
+/* ===== 复选框样式 ===== */
+
+/* 设置复选框 */
+.settings-checkbox {
+    -fx-text-fill: black;
+}
+
+/* ===== 背景设置窗口样式 ===== */
+
+/* 背景设置窗口 */
+.background-settings-window {
+    -fx-background-color: rgba(255, 255, 255, 0.9);
+}
+
+/* 背景设置按钮组 */
+.background-button-group {
+    -fx-alignment: center;
+}
+
+/* ===== 通用样式 ===== */
+
+/* 透明背景 */
+.transparent {
+    -fx-background-color: transparent;
+}
+
+/* 半透明白色背景 */
+.semi-transparent-white {
+    -fx-background-color: rgba(255, 255, 255, 0.35);
+}
+
+/* 透明面板 */
+.transparent-panel {
+    -fx-background-color: rgba(255, 255, 255, 0.35);
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: rgba(255, 255, 255, 0.5);
+    -fx-border-width: 1;
+    -fx-padding: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0.1, 2, 2);
+}
+
+/* 黑色文字 */
+.black-text {
+    -fx-text-fill: black;
+}
+
+/* 白色文字 */
+.white-text {
+    -fx-text-fill: white;
+}
+
+/* 加粗文字 */
+.bold-text {
+    -fx-font-weight: bold;
+}
