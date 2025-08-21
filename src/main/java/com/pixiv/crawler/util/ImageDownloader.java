@@ -1,6 +1,6 @@
 package com.pixiv.crawler.util;
 
-import com.pixiv.crawler.config.PixivCrawlerConfig;
+import com.pixiv.crawler.config.GlobalConfig;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -13,7 +13,7 @@ import java.net.Proxy;
 import java.util.concurrent.TimeUnit;
 
 public class ImageDownloader {
-    private static PixivCrawlerConfig crawlerConfig;
+    private static GlobalConfig crawlerConfig;
     /**
      * 下载图片到本地
      * @param imageUrl 图片的 URL
@@ -41,6 +41,14 @@ public class ImageDownloader {
             }
             InputStream inputStream = response.body().byteStream();
             FileUtils.copyInputStreamToFile(inputStream, new File(tempPath));
+        }
+
+        // 确保文件流完全关闭后再重命名
+        System.gc(); // 建议垃圾回收器清理资源
+        try {
+            Thread.sleep(100); // 短暂等待确保文件句柄释放
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
         // 下载成功后重命名
