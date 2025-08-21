@@ -36,7 +36,7 @@ public class GlobalConfig {
     // 最大下载线程数
     public static final int THREAD_COUNT = 2;
     // 基础下载路径
-    public static final String BASE_SAVE_PATH = "downloads";
+    public static final String BASE_SAVE_PATH = "E:/crawler/downloads";
     // 日榜图片基础下载路径（不包含周文件夹）
     public static final String RANKING_BASE_PATH = BASE_SAVE_PATH + "/ranking";
     // 相关推荐图片基础下载路径（不包含日期和收藏数文件夹）
