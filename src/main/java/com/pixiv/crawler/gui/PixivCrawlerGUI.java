@@ -7,6 +7,7 @@ import com.pixiv.crawler.model.SavePath;
 import com.pixiv.crawler.service.ArtistService;
 import com.pixiv.crawler.service.Downloader;
 import com.pixiv.crawler.service.PopularImageService;
+import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.util.SettingsManager;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -1049,7 +1050,7 @@ public class PixivCrawlerGUI extends Application {
                 });
                 
                 crawler.downloadRecommendImages(
-                    startPidField.getText(),
+                    JsonUtil.getImageInfoById(startPidField.getText()),
                     recommendSavePathField.getText()
                 );
                 
@@ -1141,7 +1142,7 @@ public class PixivCrawlerGUI extends Application {
                 
                 // 为每个热门作品爬取相关推荐
                 for (int i = 0; i < popularImages.size(); i++) {
-                    crawler.downloadRecommendImages(popularImages.get(i).getId(), savePath + "/recommend");
+                    crawler.downloadRecommendImages(popularImages.get(i), savePath + "/recommend");
                 }
                 
                 Platform.runLater(() -> {

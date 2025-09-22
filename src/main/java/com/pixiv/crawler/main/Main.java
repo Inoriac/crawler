@@ -3,6 +3,7 @@ package com.pixiv.crawler.main;
 import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.SavePath;
 import com.pixiv.crawler.service.Downloader;
+import com.pixiv.crawler.util.JsonUtil;
 
 import java.util.Optional;
 
@@ -38,7 +39,7 @@ public class Main {
             System.out.println("最大深度: " + GlobalConfig.MAX_DEPTH);
             System.out.println("每次获取图片数: " + GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
 
-            crawler.downloadRecommendImages(GlobalConfig.ARTWORK_START_PID, GlobalConfig.RECOMMENDATIONS_BASE_PATH);
+            crawler.downloadRecommendImages(JsonUtil.getImageInfoById(GlobalConfig.ARTWORK_START_PID), GlobalConfig.RECOMMENDATIONS_BASE_PATH);
 
             System.out.println("【相关推荐】算法执行完成");
         } catch (Exception e) {

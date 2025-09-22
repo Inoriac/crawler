@@ -1,5 +1,6 @@
 import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.main.PixivCrawler;
+import com.pixiv.crawler.util.JsonUtil;
 import org.junit.jupiter.api.Test;
 
 public class PixivRecommendTest {
@@ -13,7 +14,7 @@ public class PixivRecommendTest {
             System.out.println("最大深度: " + GlobalConfig.MAX_DEPTH);
             System.out.println("每次获取图片数: " + GlobalConfig.RECOMMEND_START_IMAGES_PER_ROUND);
 
-            crawler.downloadRecommendImages(GlobalConfig.ARTWORK_START_PID, GlobalConfig.RECOMMENDATIONS_BASE_PATH);
+            crawler.downloadRecommendImages(JsonUtil.getImageInfoById(GlobalConfig.ARTWORK_START_PID), GlobalConfig.RECOMMENDATIONS_BASE_PATH);
 
             System.out.println("【相关推荐】算法执行完成");
         } catch (Exception e) {

@@ -253,51 +253,10 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 提取tags字段的内容
-     */
-    private static String extractTagContentFromIllust(String illustObj, int startPos) {
-        int bracketCount = 0;
-        boolean inArray = false;
-        int endPos = startPos;
-        
-        for (int i = startPos; i < illustObj.length(); i++) {
-            char c = illustObj.charAt(i);
-            
-            if (c == '[' && !inArray) {
-                inArray = true;
-                bracketCount = 1;
-            } else if (c == '[' && inArray) {
-                bracketCount++;
-            } else if (c == ']' && inArray) {
-                bracketCount--;
-                if (bracketCount == 0) {
-                    endPos = i;
-                    break;
-                }
-            } else if (c == '{' && !inArray) {
-                inArray = true;
-                bracketCount = 1;
-            } else if (c == '{' && inArray) {
-                bracketCount++;
-            } else if (c == '}' && inArray) {
-                bracketCount--;
-                if (bracketCount == 0) {
-                    endPos = i;
-                    break;
-                }
-            }
-        }
-        
-        if (endPos > startPos) {
-            return illustObj.substring(startPos, endPos + 1);
-        }
-        
-        return null;
-    }
     
     /**
      * 解析作品对象中的tags字段
+     * 解析嵌套格式：body.tags.tags数组，每个对象包含tag属性
      */
     public static List<String> parseTags(String illustObj) {
         if (illustObj == null || illustObj.isEmpty()) {
@@ -305,51 +264,79 @@ public class JsonUtil {
         }
         
         try {
-            // 从json中提取tags字段
-            String tagsContent = "";
-
-            String[] possibleTagFields = {
-                    "\"tags\":", "\"tag\":", "\"tagList\":", "\"tag_list\":",
-                    "\"illustTags\":", "\"illust_tags\":", "\"userTags\":", "\"user_tags\":"
-            };
-
-            for (String tagField : possibleTagFields) {
-                int tagStart = illustObj.indexOf(tagField);
-                if (tagStart != -1) {
-                    tagsContent = extractTagContentFromIllust(illustObj, tagStart + tagField.length());
-                }
-            }
-
-            if (tagsContent == null || tagsContent.isEmpty()) {
-                return new ArrayList<>();
-            }
-
             List<String> tags = new ArrayList<>();
-
-            // 移除方括号
-            if (tagsContent.startsWith("[") && tagsContent.endsWith("]")) {
-                tagsContent = tagsContent.substring(1, tagsContent.length() - 1);
-            }
-
-            // 分割标签
-            String[] tagArray = tagsContent.split(",");
-            for (String tag : tagArray) {
-                tag = tag.trim();
-                // 移除引号
-                if ((tag.startsWith("\"") && tag.endsWith("\"")) ||
-                        (tag.startsWith("'") && tag.endsWith("'"))) {
-                    tag = tag.substring(1, tag.length() - 1);
+            
+            // 查找 "tags": { ... "tags": [ ... ] ... }
+            Pattern nestedTagsPattern = Pattern.compile("\"tags\"\\s*:\\s*\\{[^}]*\"tags\"\\s*:\\s*\\[([^\\]]+)\\]");
+            Matcher matcher = nestedTagsPattern.matcher(illustObj);
+            
+            if (matcher.find()) {
+                String tagsArrayContent = matcher.group(1);
+                System.out.println("【标签解析】找到嵌套tags数组内容: " + tagsArrayContent.substring(0, Math.min(100, tagsArrayContent.length())) + "...");
+                
+                // 解析数组中的每个对象，提取tag属性
+                Pattern tagObjectPattern = Pattern.compile("\\{[^}]*\"tag\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher tagMatcher = tagObjectPattern.matcher(tagsArrayContent);
+                
+                while (tagMatcher.find()) {
+                    String tag = tagMatcher.group(1);
+                    if (tag != null && !tag.trim().isEmpty()) {
+                        String trimmedTag = tag.trim();
+                        // 处理Unicode转义字符
+                        String unescapedTag = unescapeUnicode(trimmedTag);
+                        tags.add(unescapedTag);
+                        System.out.println("【标签解析】提取到标签: [" + unescapedTag + "] (长度: " + unescapedTag.length() + ")");
+                    }
                 }
-                if (!tag.isEmpty()) {
-                    tags.add(tag);
-                }
+                
+                System.out.println("【标签解析】解析完成，找到 " + tags.size() + " 个标签");
+            } else {
+                System.out.println("【标签解析】未找到嵌套tags结构");
             }
-
+            
             return tags;
             
         } catch (Exception e) {
             System.out.println("【标签解析】解析tags时发生错误: " + e.getMessage());
+            e.printStackTrace();
             return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 将Unicode转义字符转换为正常字符
+     * 例如: \\u30b9\\u30ba\\u30e9\\u30f3 -> スズラン
+     */
+    private static String unescapeUnicode(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        
+        try {
+            StringBuilder sb = new StringBuilder();
+            int i = 0;
+            while (i < str.length()) {
+                if (i < str.length() - 5 && str.charAt(i) == '\\' && str.charAt(i + 1) == 'u') {
+                    // 找到 \\uXXXX 格式
+                    String hex = str.substring(i + 2, i + 6);
+                    try {
+                        int codePoint = Integer.parseInt(hex, 16);
+                        sb.append((char) codePoint);
+                        i += 6;
+                    } catch (NumberFormatException e) {
+                        // 如果不是有效的十六进制，保持原样
+                        sb.append(str.charAt(i));
+                        i++;
+                    }
+                } else {
+                    sb.append(str.charAt(i));
+                    i++;
+                }
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            System.out.println("【Unicode转义】处理失败: " + e.getMessage());
+            return str; // 如果处理失败，返回原字符串
         }
     }
 
@@ -407,8 +394,11 @@ public class JsonUtil {
             parseBasicInfo(responseText, image);
             
             // 解析tags信息
+            // TODO: tags 解析有问题
             List<String> tags = parseTags(responseText);
             image.setTags(tags);
+
+            System.out.println("【JsonUtil】" + pid + " tags:" + tags);
             
             // 检测R-18和漫画
             detectContentFlags(tags, image);

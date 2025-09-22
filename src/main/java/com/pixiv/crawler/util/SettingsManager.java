@@ -114,3 +114,4 @@ public class SettingsManager {
         setString(KEY_BACKGROUND_PATH, path);
     }
 }
+
