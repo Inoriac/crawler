@@ -160,6 +160,15 @@ public class JsonUtil {
                 image.setArtist("未知作者");
             }
 
+            // 提取作品图片数
+            Pattern countPattern = Pattern.compile("\"pageCount\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher countMatcher = countPattern.matcher(illustObj);
+            if (countMatcher.find()) {
+                image.setPageCount(Integer.parseInt(countMatcher.group(1)));
+            } else {
+                image.setPageCount(1);
+            }
+
             // 提取创建日期并构造下载URL
             Pattern datePattern = Pattern.compile("\"createDate\"\\s*:\\s*\"([^\"]+)\"");
             Matcher dateMatcher = datePattern.matcher(illustObj);
@@ -456,7 +465,6 @@ public class JsonUtil {
             parseBasicInfo(responseText, image);
             
             // 解析tags信息
-            // TODO: tags 解析有问题
             List<String> tags = parseTags(responseText);
             image.setTags(tags);
 
@@ -473,6 +481,9 @@ public class JsonUtil {
 
         } catch (Exception e) {
             System.out.println("【JsonUtil】获取作品信息失败: " + e.getMessage());
+            if (e.getMessage().contains("handshake") || e.getMessage().contains("connection")) {
+                System.out.println("【JsonUtil】检测到网络连接问题，建议检查网络状态或代理设置");
+            }
             return null;
         }
     }

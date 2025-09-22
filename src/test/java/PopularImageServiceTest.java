@@ -36,7 +36,7 @@ public class PopularImageServiceTest {
             List<PixivImage> popularImages = popularImageService.getPopularImagesByTag(tag);
 
             String savePath = GlobalConfig.POPULAR_BASE_PATH + "/" + tag;
-//            downloader.startDownload(popularImages, "热门作品" , savePath);
+            downloader.startDownload(popularImages, "热门作品" , savePath);
 
             // 根据获取到的热门图片，依次获取下面的推荐图片
             for (int i = 0; i < popularImages.size(); i++) {

@@ -153,7 +153,17 @@ public class PixivCrawler {
             List<String> nextStartCandidates = new ArrayList<>();
 
             for(PixivImage image : currentStartImages){
+                // 跳过null对象
+                if (image == null) {
+                    System.out.println("【警告】发现null的PixivImage对象，跳过处理");
+                    continue;
+                }
+                
                 String pid = image.getId();
+                if (pid == null || pid.isEmpty()) {
+                    System.out.println("【警告】发现ID为空的PixivImage对象，跳过处理");
+                    continue;
+                }
 
                 // 跳过已爬取
                 if (visited.contains(pid)) continue;
@@ -422,10 +432,20 @@ public class PixivCrawler {
             System.out.println("【调试】第" + selectionAttempts + "次选择尝试，结果: " + selectedPid);
 
             // 选到图片且未重复
-            if(selectedPid != null && !selected.contains(selectedPid)){
-                PixivImage image = JsonUtil.getImageInfoById(selectedPid);
-                selected.add(image);
-                System.out.println("【调试】成功选择图片: " + selectedPid);
+            if(selectedPid != null){
+                // 检查是否已经选择了这个ID的图片
+                boolean alreadySelected = selected.stream()
+                    .anyMatch(img -> img != null && selectedPid.equals(img.getId()));
+                
+                if (!alreadySelected) {
+                    PixivImage image = JsonUtil.getImageInfoById(selectedPid);
+                    if (image != null) {
+                        selected.add(image);
+                        System.out.println("【调试】成功选择图片: " + selectedPid);
+                    } else {
+                        System.out.println("【警告】获取图片信息失败，跳过: " + selectedPid);
+                    }
+                }
             }
         }
 
