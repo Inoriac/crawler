@@ -28,8 +28,8 @@ public class GlobalConfig {
     public static int MAX_IMAGES_PER_WORK = 5;
     // 队列满时的处理阈值
     public static int QUEUE_PROCESS_THRESHOLD = 10;
-    // 单轮获取推荐图片数量
-    public static int RECOMMEND_MAX_IMAGE = 20;
+    // 推荐图片单次获取数量(推荐值在40左右，不可超过100，值越大，运行时间越长)
+    public static int PER_RECOMMEND_MAX_IMAGE = 45;
     // 获取画师图片数量
     public static int ARTIST_MAX_IMAGE = 30;
 

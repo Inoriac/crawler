@@ -159,6 +159,9 @@ public class PixivCrawler {
                 if (visited.contains(pid)) continue;
                 visited.add(pid);
 
+                // 跳过漫画作品
+                if(image.isManga() && GlobalConfig.MANGA_EXCLUDE_ENABLED) continue;
+
                 // 跳过 tag 不符合
                 if(tag != null && !(image.getTags().contains(tag))) continue;
 
@@ -185,13 +188,16 @@ public class PixivCrawler {
                 }
 
                 // 获取相关推荐图片完整信息
-                List<PixivImage> recImages = RecommendUtil.getRecommendImagesByPid(pid, GlobalConfig.RECOMMEND_MAX_IMAGE); // 获取20张推荐图片
+                List<PixivImage> recImages = RecommendUtil.getRecommendImagesByPid(pid, GlobalConfig.PER_RECOMMEND_MAX_IMAGE); // 获取20张推荐图片
                 System.out.println("【相关推荐】获取到 " + recImages.size() + " 张推荐图片");
                 
                 // 将推荐图片直接添加到对应的队列中，并收集ID用于下一轮
                 for (PixivImage recImage : recImages) {
                     // 跳过 tag 不符合的图片
-                    if(tag != null && !(image.getTags().contains(tag))) continue;
+                    if(tag != null && !(recImage.getTags().contains(tag))) {
+                        System.out.println("【tag】" + recImage.getId() + "因tag不符合被排除");
+                        continue;
+                    }
 
                     nextStartCandidates.add(recImage.getId());
                     allRecommendImages.put(recImage.getId(), recImage); // 保存完整信息
@@ -207,7 +213,7 @@ public class PixivCrawler {
                     }
                     
                     // 直接分类推荐图片到对应队列（排除漫画作品）
-                    if (recImage.isManga()) {
+                    if (recImage.isManga() && GlobalConfig.MANGA_EXCLUDE_ENABLED) {
                         System.out.println("【分类】" + recImage.getId() + " -> 漫画作品，已排除 (收藏数: " + recImage.getBookmarkCount() + ")");
                         continue;
                     }

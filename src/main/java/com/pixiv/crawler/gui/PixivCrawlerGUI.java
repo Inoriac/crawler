@@ -3,7 +3,6 @@ package com.pixiv.crawler.gui;
 import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.main.PixivCrawler;
 import com.pixiv.crawler.model.PixivImage;
-import com.pixiv.crawler.model.SavePath;
 import com.pixiv.crawler.service.ArtistService;
 import com.pixiv.crawler.service.Downloader;
 import com.pixiv.crawler.service.PopularImageService;
@@ -21,7 +20,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Modality;
 import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.LinearGradient;
@@ -390,7 +388,7 @@ public class PixivCrawlerGUI extends Application {
         
         // 推荐图片数
         HBox recommendBox = new HBox(10);
-        TextField recommendField = new TextField(String.valueOf(GlobalConfig.RECOMMEND_MAX_IMAGE));
+        TextField recommendField = new TextField(String.valueOf(GlobalConfig.PER_RECOMMEND_MAX_IMAGE));
         recommendField.getStyleClass().add("text-field");
         recommendBox.getChildren().addAll(
             new Label("推荐图片数:"),

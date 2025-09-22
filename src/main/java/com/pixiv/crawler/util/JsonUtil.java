@@ -256,7 +256,9 @@ public class JsonUtil {
     
     /**
      * 解析作品对象中的tags字段
-     * 解析嵌套格式：body.tags.tags数组，每个对象包含tag属性
+     * 支持两种格式：
+     * 1. Popular作品格式：body.tags.tags数组，每个对象包含tag属性
+     * 2. 相关推荐格式：直接包含tags数组
      */
     public static List<String> parseTags(String illustObj) {
         if (illustObj == null || illustObj.isEmpty()) {
@@ -264,15 +266,44 @@ public class JsonUtil {
         }
         
         try {
-            List<String> tags = new ArrayList<>();
+            // 首先尝试解析Popular作品格式：body.tags.tags数组
+            List<String> popularTags = parsePopularFormatTags(illustObj);
+            if (!popularTags.isEmpty()) {
+                System.out.println("【标签解析】使用Popular格式解析，找到 " + popularTags.size() + " 个标签");
+                return popularTags;
+            }
             
+            // 如果Popular格式解析失败，尝试相关推荐格式：直接tags数组
+            List<String> recommendTags = parseRecommendFormatTags(illustObj);
+            if (!recommendTags.isEmpty()) {
+                System.out.println("【标签解析】使用相关推荐格式解析，找到 " + recommendTags.size() + " 个标签");
+                return recommendTags;
+            }
+            
+            System.out.println("【标签解析】未找到任何tags结构");
+            return new ArrayList<>();
+            
+        } catch (Exception e) {
+            System.out.println("【标签解析】解析tags时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * 解析Popular作品格式的tags：body.tags.tags数组，每个对象包含tag属性
+     */
+    private static List<String> parsePopularFormatTags(String illustObj) {
+        List<String> tags = new ArrayList<>();
+        
+        try {
             // 查找 "tags": { ... "tags": [ ... ] ... }
             Pattern nestedTagsPattern = Pattern.compile("\"tags\"\\s*:\\s*\\{[^}]*\"tags\"\\s*:\\s*\\[([^\\]]+)\\]");
             Matcher matcher = nestedTagsPattern.matcher(illustObj);
             
             if (matcher.find()) {
                 String tagsArrayContent = matcher.group(1);
-                System.out.println("【标签解析】找到嵌套tags数组内容: " + tagsArrayContent.substring(0, Math.min(100, tagsArrayContent.length())) + "...");
+                System.out.println("【标签解析】找到Popular格式tags数组内容: " + tagsArrayContent.substring(0, Math.min(100, tagsArrayContent.length())) + "...");
                 
                 // 解析数组中的每个对象，提取tag属性
                 Pattern tagObjectPattern = Pattern.compile("\\{[^}]*\"tag\"\\s*:\\s*\"([^\"]+)\"");
@@ -285,27 +316,58 @@ public class JsonUtil {
                         // 处理Unicode转义字符
                         String unescapedTag = unescapeUnicode(trimmedTag);
                         tags.add(unescapedTag);
-                        System.out.println("【标签解析】提取到标签: [" + unescapedTag + "] (长度: " + unescapedTag.length() + ")");
+                        System.out.println("【标签解析】提取到Popular格式标签: [" + unescapedTag + "] (长度: " + unescapedTag.length() + ")");
                     }
                 }
-                
-                System.out.println("【标签解析】解析完成，找到 " + tags.size() + " 个标签");
-            } else {
-                System.out.println("【标签解析】未找到嵌套tags结构");
             }
-            
-            return tags;
-            
         } catch (Exception e) {
-            System.out.println("【标签解析】解析tags时发生错误: " + e.getMessage());
-            e.printStackTrace();
-            return new ArrayList<>();
+            System.out.println("【标签解析】解析Popular格式tags失败: " + e.getMessage());
         }
+        
+        return tags;
+    }
+    
+    /**
+     * 解析相关推荐格式的tags：直接包含tags数组
+     */
+    private static List<String> parseRecommendFormatTags(String illustObj) {
+        List<String> tags = new ArrayList<>();
+        
+        try {
+            // 查找直接的 "tags": [ ... ] 格式
+            Pattern directTagsPattern = Pattern.compile("\"tags\"\\s*:\\s*\\[([^\\]]+)\\]");
+            Matcher matcher = directTagsPattern.matcher(illustObj);
+            
+            if (matcher.find()) {
+                String tagsArrayContent = matcher.group(1);
+                System.out.println("【标签解析】找到相关推荐格式tags数组内容: " + tagsArrayContent.substring(0, Math.min(100, tagsArrayContent.length())) + "...");
+                
+                // 分割标签字符串
+                String[] tagArray = tagsArrayContent.split(",");
+                for (String tag : tagArray) {
+                    tag = tag.trim();
+                    // 移除引号
+                    if ((tag.startsWith("\"") && tag.endsWith("\"")) ||
+                            (tag.startsWith("'") && tag.endsWith("'"))) {
+                        tag = tag.substring(1, tag.length() - 1);
+                    }
+                    if (!tag.isEmpty()) {
+                        // 处理Unicode转义字符
+                        String unescapedTag = unescapeUnicode(tag);
+                        tags.add(unescapedTag);
+                        System.out.println("【标签解析】提取到相关推荐格式标签: [" + unescapedTag + "] (长度: " + unescapedTag.length() + ")");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("【标签解析】解析相关推荐格式tags失败: " + e.getMessage());
+        }
+        
+        return tags;
     }
 
     /**
      * 将Unicode转义字符转换为正常字符
-     * 例如: \\u30b9\\u30ba\\u30e9\\u30f3 -> スズラン
      */
     private static String unescapeUnicode(String str) {
         if (str == null || str.isEmpty()) {

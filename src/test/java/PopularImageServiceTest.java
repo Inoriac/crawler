@@ -31,7 +31,8 @@ public class PopularImageServiceTest {
         PixivCrawler pixivCrawler = new PixivCrawler();
 
         try{
-            String tag = "スズラン(アークナイツ)";
+//            String tag = "スズラン(アークナイツ)";
+            String tag = "黒スト";
             List<PixivImage> popularImages = popularImageService.getPopularImagesByTag(tag);
 
             String savePath = GlobalConfig.POPULAR_BASE_PATH + "/" + tag;
