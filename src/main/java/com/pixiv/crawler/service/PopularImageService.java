@@ -69,13 +69,13 @@ public interface PopularImageService {
             System.out.println("【热门作品】包含recent字段: " + hasRecent);
             System.out.println("【热门作品】包含permanent字段: " + hasPermanent);
 
-            // 解析recent数组
-            List<PixivImage> recentImages = parsePopularArray(popularContent, "recent");
-            popularImages.addAll(recentImages);
-
             // 解析permanent数组
             List<PixivImage> permanentImages = parsePopularArray(popularContent, "permanent");
             popularImages.addAll(permanentImages);
+
+            // 解析recent数组
+            List<PixivImage> recentImages = parsePopularArray(popularContent, "recent");
+            popularImages.addAll(recentImages);
 
             System.out.println("【热门作品】JSON解析完成，共找到 " + popularImages.size() + " 个热门作品");
 
