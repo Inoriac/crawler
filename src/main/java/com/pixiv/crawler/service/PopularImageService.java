@@ -99,26 +99,18 @@ public interface PopularImageService {
         try {
             // 查找数组的开始位置 - 修复正则表达式
             String arrayStartPattern = "\"" + arrayName + "\":\\[";
-            int arrayStart = popularContent.indexOf(arrayStartPattern);
+            int arrayStart = popularContent.indexOf("\"" + arrayName + "\":");
             if (arrayStart == -1) {
-                System.out.println("【热门作品】未找到" + arrayName + "数组，尝试其他方式查找");
-                // 尝试更宽松的查找方式
-                arrayStart = popularContent.indexOf("\"" + arrayName + "\":");
-                if (arrayStart == -1) {
-                    System.out.println("【热门作品】完全未找到" + arrayName + "字段");
-                    return images;
-                }
-                // 找到冒号后的第一个 [ 符号
-                int bracketStart = popularContent.indexOf("[", arrayStart);
-                if (bracketStart == -1) {
-                    System.out.println("【热门作品】未找到" + arrayName + "数组的开始括号");
-                    return images;
-                }
-                arrayStart = bracketStart;
-            } else {
-                // 如果找到了完整模式，调整到 [ 的位置
-                arrayStart = popularContent.indexOf("[", arrayStart);
+                System.out.println("【热门作品】完全未找到" + arrayName + "字段");
+                return images;
             }
+            // 找到冒号后的第一个 [ 符号
+            int bracketStart = popularContent.indexOf("[", arrayStart);
+            if (bracketStart == -1) {
+                System.out.println("【热门作品】未找到" + arrayName + "数组的开始括号");
+                return images;
+            }
+            arrayStart = bracketStart;
 
             // 找到数组的结束位置
             int bracketCount = 0;
@@ -166,11 +158,15 @@ public interface PopularImageService {
                 if (pid != null) {
                     // 使用JsonUtil中的getImageInfoById方法获取完整信息
                     PixivImage image = JsonUtil.getImageInfoById(pid);
-                    if (image.getBookmarkCount() >= 500) {
-                        images.add(image);
-                        System.out.println("【热门作品】解析" + arrayName + "作品: " + image.getId() + " - " + image.getTitle());
+                    if (image != null && image.getId() != null) {
+                        if (image.getBookmarkCount() >= 500) {
+                            images.add(image);
+                            System.out.println("【热门作品】解析" + arrayName + "作品: " + image.getId() + " - " + image.getTitle());
+                        } else {
+                            System.out.println("【热门作品】收藏数小于500，舍弃 (ID: " + pid + ", 收藏数: " + image.getBookmarkCount() + ")");
+                        }
                     } else {
-                        System.out.println("【热门作品】收藏数小于500，舍弃");
+                        System.out.println("【热门作品】获取作品信息失败，跳过 (ID: " + pid + ")");
                     }
                 } else {
                     System.out.println("【热门作品】无法从JSON对象中提取ID");

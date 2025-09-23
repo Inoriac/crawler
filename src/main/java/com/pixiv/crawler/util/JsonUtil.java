@@ -86,6 +86,14 @@ public class JsonUtil {
      */
     public static void parseBasicInfo(String responseText, PixivImage image) {
         try {
+            Pattern idPattern = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher idMatcher = idPattern.matcher(responseText);
+            if (idMatcher.find()) {
+                image.setId(idMatcher.group(1));
+            } else {
+                image.setId(null);
+            }
+
             // 提取标题
             Pattern titlePattern = Pattern.compile("\"title\"\\s*:\\s*\"([^\"]+)\"");
             Matcher titleMatcher = titlePattern.matcher(responseText);
@@ -183,10 +191,12 @@ public class JsonUtil {
 
                 PixivImage image = new PixivImage();
                 parseBasicInfo(illustObj, image);
-                if (image != null) {
+                if (image != null && image.getId() != null && !image.getId().isEmpty()) {
                     recommendImages.add(image);
                     count++;
                     System.out.println("【相关推荐】解析作品: " + image.getId() + " - " + image.getTitle());
+                } else {
+                    System.out.println("【相关推荐】跳过无效作品 (ID为空或解析失败)");
                 }
             }
 
@@ -399,7 +409,7 @@ public class JsonUtil {
      */
     private static void constructUrl(String responseText, PixivImage image) {
         try {
-            // 从urls.original获取URL
+            // 首先尝试从urls.original获取URL
             Pattern originalUrlPattern = Pattern.compile("\"original\"\\s*:\\s*\"([^\"]+)\"");
             Matcher originalUrlMatcher = originalUrlPattern.matcher(responseText);
             
@@ -407,12 +417,48 @@ public class JsonUtil {
                 String originalUrl = originalUrlMatcher.group(1);
                 image.setUrl(originalUrl);
                 System.out.println("【JsonUtil】使用原始URL: " + originalUrl);
+                return;
             }
+            
+            // 如果没有找到original URL，尝试使用createDate构造URL
+            Pattern datePattern = Pattern.compile("\"createDate\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher dateMatcher = datePattern.matcher(responseText);
+
+            if (dateMatcher.find()) {
+                String createDate = dateMatcher.group(1);
+                // 使用createDate构造下载URL
+                try {
+                    java.time.ZonedDateTime dateTime = java.time.ZonedDateTime.parse(createDate);
+                    String datePath = String.format("%04d/%02d/%02d/%02d/%02d/%02d",
+                            dateTime.getYear(), dateTime.getMonthValue(), dateTime.getDayOfMonth(),
+                            dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
+
+                    String downloadUrl = "https://i.pximg.net/img-original/img/" + datePath + "/" + image.getId() + "_p0.jpg";
+                    image.setUrl(downloadUrl);
+                    System.out.println("【JsonUtil】构造下载URL: " + downloadUrl);
+                    return;
+                } catch (Exception e) {
+                    System.out.println("【JsonUtil】日期解析失败: " + e.getMessage());
+                }
+            }
+            
+            // 如果以上都失败，使用备用URL
+            String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
+            image.setUrl(fallbackUrl);
+            System.out.println("【JsonUtil】使用备用URL: " + fallbackUrl);
+            
         } catch (Exception e) {
             // 如果构造URL失败，使用备用URL
             String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
             image.setUrl(fallbackUrl);
             System.out.println("【JsonUtil】构造URL失败，使用备用URL: " + fallbackUrl);
+        }
+        
+        // 确保URL不为null
+        if (image.getUrl() == null) {
+            String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
+            image.setUrl(fallbackUrl);
+            System.out.println("【JsonUtil】URL为null，设置备用URL: " + fallbackUrl);
         }
     }
 
@@ -433,9 +479,8 @@ public class JsonUtil {
 
         } catch (Exception e) {
             System.out.println("【JsonUtil】提取pageCount失败: " + e.getMessage());
+            image.setPageCount(1);
         }
-        System.out.println("【JsonUtil】未找到pageCount，默认为1页");
-        image.setPageCount(1);
     }
 
     /**
