@@ -3,9 +3,9 @@ package com.pixiv.crawler.gui;
 import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.main.PixivCrawler;
 import com.pixiv.crawler.model.PixivImage;
-import com.pixiv.crawler.service.ArtistService;
-import com.pixiv.crawler.service.Downloader;
-import com.pixiv.crawler.service.PopularImageService;
+import com.pixiv.crawler.service.impl.ArtistServiceImpl;
+import com.pixiv.crawler.service.impl.Downloader;
+import com.pixiv.crawler.service.impl.PopularImageServiceImpl;
 import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.util.SettingsManager;
 import javafx.application.Application;
@@ -1126,14 +1126,14 @@ public class PixivCrawlerGUI extends Application {
             try {
                 crawler = new PixivCrawler();
                 downloader = new Downloader();
-                PopularImageService popularImageService = new PopularImageService();
+                PopularImageServiceImpl popularImageServiceImpl = new PopularImageServiceImpl();
                 
                 Platform.runLater(() -> {
                     logMessage("开始执行热门作品爬取...");
                 });
                 
                 String tag = popularTagField.getText();
-                List<PixivImage> popularImages = popularImageService.getPopularImagesByTag(tag);
+                List<PixivImage> popularImages = popularImageServiceImpl.getPopularImagesByTag(tag);
                 
                 String savePath = popularSavePathField.getText() + "/" + tag;
                 downloader.startDownload(popularImages, "热门作品", savePath);
@@ -1177,15 +1177,15 @@ public class PixivCrawlerGUI extends Application {
             try {
                 crawler = new PixivCrawler();
                 downloader = new Downloader();
-                ArtistService artistService = new ArtistService();
+                ArtistServiceImpl artistServiceImpl = new ArtistServiceImpl();
                 
                 Platform.runLater(() -> {
                     logMessage("开始执行画师作品爬取...");
                 });
                 
                 String artistId = artistIdField.getText();
-                List<PixivImage> pixivImages = artistService.searchArtworksByArtistId(artistId, GlobalConfig.ARTIST_MAX_IMAGE);
-                String artistName = artistService.getArtistName(artistId);
+                List<PixivImage> pixivImages = artistServiceImpl.searchArtworksByArtistId(artistId, GlobalConfig.ARTIST_MAX_IMAGE);
+                String artistName = artistServiceImpl.getArtistName(artistId);
                 
                 String savePath = artistSavePathField.getText() + "/" + artistName;
                 downloader.startDownload(pixivImages, "画师作品", savePath);

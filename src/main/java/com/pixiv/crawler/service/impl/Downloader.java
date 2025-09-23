@@ -1,4 +1,4 @@
-package com.pixiv.crawler.service;
+package com.pixiv.crawler.service.impl;
 
 import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.PixivImage;

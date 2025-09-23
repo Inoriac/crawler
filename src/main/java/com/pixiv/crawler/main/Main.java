@@ -2,10 +2,9 @@ package com.pixiv.crawler.main;
 
 import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.SavePath;
-import com.pixiv.crawler.service.Downloader;
+import com.pixiv.crawler.service.impl.Downloader;
 import com.pixiv.crawler.util.JsonUtil;
 
-import java.util.Optional;
 
 // TODO：可以提供下载进度条(待图形化之后考虑加入这个东西)
 public class Main {

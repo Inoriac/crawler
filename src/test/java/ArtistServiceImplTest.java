@@ -1,15 +1,13 @@
 import com.pixiv.crawler.config.GlobalConfig;
-import com.pixiv.crawler.main.PixivCrawler;
 import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.model.SavePath;
-import com.pixiv.crawler.service.ArtistService;
-import com.pixiv.crawler.service.Downloader;
-import com.pixiv.crawler.util.ImageDownloader;
+import com.pixiv.crawler.service.impl.ArtistServiceImpl;
+import com.pixiv.crawler.service.impl.Downloader;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-public class ArtistServiceTest {
+public class ArtistServiceImplTest {
     private static volatile boolean stopFlag = false;
     private static Downloader downloader = new Downloader();
     @Test
@@ -27,11 +25,11 @@ public class ArtistServiceTest {
             SavePath.cleanDownloadPaths();
         }));
 
-        ArtistService artistService = new ArtistService();
+        ArtistServiceImpl artistServiceImpl = new ArtistServiceImpl();
 
         try {
-            List<PixivImage> pixivImages = artistService.searchArtworksByArtistId(GlobalConfig.ARTIST_START_ID, GlobalConfig.ARTIST_MAX_IMAGE);
-            String artistName = artistService.getArtistName(GlobalConfig.ARTIST_START_ID);
+            List<PixivImage> pixivImages = artistServiceImpl.searchArtworksByArtistId(GlobalConfig.ARTIST_START_ID, GlobalConfig.ARTIST_MAX_IMAGE);
+            String artistName = artistServiceImpl.getArtistName(GlobalConfig.ARTIST_START_ID);
 
             String savePath = GlobalConfig.ARTIST_BASE_PATH + "/" + artistName;
 

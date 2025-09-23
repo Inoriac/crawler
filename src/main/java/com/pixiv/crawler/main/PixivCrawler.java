@@ -1,7 +1,7 @@
 package com.pixiv.crawler.main;
 
 import com.pixiv.crawler.config.GlobalConfig;
-import com.pixiv.crawler.service.Downloader;
+import com.pixiv.crawler.service.impl.Downloader;
 import com.pixiv.crawler.util.DateUtils;
 import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.util.RecommendUtil;
