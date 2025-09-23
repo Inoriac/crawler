@@ -15,8 +15,9 @@ public class RecommendUtilTest {
     public void testMangaTagDetection() {
         // 测试包含漫画标签的JSON
         String mangaJson = "{\"id\":\"123456\",\"title\":\"测试漫画\",\"userName\":\"测试作者\",\"createDate\":\"2025-01-01T00:00:00+09:00\",\"tags\":[\"R-18\",\"漫画\",\"测试标签\"]}";
-        
-        PixivImage image = JsonUtil.parseIllustObject(mangaJson);
+
+        PixivImage image = new PixivImage();
+        JsonUtil.parseBasicInfo(mangaJson, image);
         
         assertNotNull(image);
         assertEquals("123456", image.getId());
@@ -30,8 +31,9 @@ public class RecommendUtilTest {
     public void testNormalTagDetection() {
         // 测试不包含漫画标签的JSON
         String normalJson = "{\"id\":\"789012\",\"title\":\"测试插画\",\"userName\":\"测试作者\",\"createDate\":\"2025-01-01T00:00:00+09:00\",\"tags\":[\"R-18\",\"插画\",\"测试标签\"]}";
-        
-        PixivImage image = JsonUtil.parseIllustObject(normalJson);
+
+        PixivImage image = new PixivImage();
+        JsonUtil.parseBasicInfo(normalJson, image);
         
         assertNotNull(image);
         assertEquals("789012", image.getId());

@@ -93,7 +93,9 @@ public interface ArtistService {
                 if (count >= maxImages) break;
 
                 // 使用JsonUtil中的方法解析单个作品对象
-                PixivImage image = JsonUtil.parseIllustObject(illustObj);
+                PixivImage image = new PixivImage();
+                JsonUtil.parseBasicInfo(illustObj, image);
+
                 if (image != null) {
                     artistWorks.add(image);
                     count++;

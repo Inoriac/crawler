@@ -5,6 +5,8 @@ import com.pixiv.crawler.util.JsonUtil;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public interface PopularImageService {
     public List<PixivImage> getPopularImagesByTag(String tag) throws Exception;
@@ -153,8 +155,14 @@ public interface PopularImageService {
             System.out.println("【热门作品】" + arrayName + "数组找到 " + illustObjects.size() + " 个作品对象");
 
             for (String illustObj : illustObjects) {
-                // 先从JSON对象中提取ID
-                String pid = JsonUtil.extractIdFromIllustObj(illustObj);
+                // 使用正则表达式提取ID，确保正确处理引号
+                String pid = null;
+                Pattern idPattern = Pattern.compile("\"id\"\\s*:\\s*\"(\\d+)\"");
+                Matcher idMatcher = idPattern.matcher(illustObj);
+                if (idMatcher.find()) {
+                    pid = idMatcher.group(1); // 返回第一个捕获组，即数字ID
+                }
+
                 if (pid != null) {
                     // 使用JsonUtil中的getImageInfoById方法获取完整信息
                     PixivImage image = JsonUtil.getImageInfoById(pid);
