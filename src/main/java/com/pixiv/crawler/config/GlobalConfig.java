@@ -29,12 +29,12 @@ public class GlobalConfig {
     // 队列满时的处理阈值
     public static int QUEUE_PROCESS_THRESHOLD = 10;
     // 推荐图片单次获取数量(推荐值在25左右，不可超过100，值越大，运行时间越长)
-    public static int PER_RECOMMEND_MAX_IMAGE = 25;
+    public static int PER_RECOMMEND_MAX_IMAGE = 32;
     // 获取画师图片数量
     public static int ARTIST_MAX_IMAGE = 30;
 
     // 最大下载线程数
-    public static int THREAD_COUNT = 2;
+    public static int THREAD_COUNT = 5;
     // 基础下载路径
     public static String BASE_SAVE_PATH = "E:/crawler/downloads";
     // 日榜图片基础下载路径（不包含周文件夹）
@@ -71,7 +71,16 @@ public class GlobalConfig {
     // 下载配置
     public static boolean AUTO_CLEAN_PART_FILES = true; // 自动清理.part文件
     public static boolean SHOW_DOWNLOAD_PROGRESS = true; // 显示下载进度
-    
+
+    // 图片识别tag服务相关
+    public static int TAG_SERVICE_PORT = 8000;  // 本地tag识别服务端口
+    public static double TAG_SERVICE_THRESHOLD = 0.35;  // 控制tag识别的效果，0.35为佳
+    public static String TAG_SERVICE_URL_LOCAL = "http://127.0.0.1:" + TAG_SERVICE_PORT + "/predict?threshold=" + TAG_SERVICE_THRESHOLD;
+    public static String TAG_SERVICE_URL_REMOTE = "";   // 远程api调用 留空，目前没有找到可调用的稳定免费api
+    public static double TAG_PROBILITY = 0.5;
+    public static double TAG_FINAL_PROB = 0.4;
+    public static String TAG_SERVICE_JSON_NAME = "tags.json";
+    public static int TAG_SERVICE_JSON_FILE_MAX_NUMBER = 10;
     // 验证概率总和是否为1
     public static boolean validateProbabilities() {
         double sum = TOP1W_SELECTION_PROBABILITY + TOP5K_SELECTION_PROBABILITY + 
