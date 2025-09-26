@@ -17,6 +17,7 @@ public class PopularImageServiceImpl implements PopularImageService {
     public List<PixivImage> getPopularImagesByTag(String tag) throws Exception{
         Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(GlobalConfig.HOST, GlobalConfig.PORT));
 
+        // TODO：此处的url很有可能有误
         String searchUrl = "https://www.pixiv.net/ajax/search/artworks/" + tag + "?word=sea&order=date_d&mode=all&p=1&csw=0&s_mode=s_tag&type=all&lang=zh";
 
         OkHttpClient client = new OkHttpClient.Builder()

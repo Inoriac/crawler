@@ -1,5 +1,6 @@
 package com.pixiv.crawler.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.TagInfo;
@@ -8,8 +9,11 @@ import okhttp3.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class TagServiceImpl implements TagService {
     private OkHttpClient client;
@@ -39,7 +43,46 @@ public class TagServiceImpl implements TagService {
             String json = response.body().string();
             Map<String, Object> res = mapper.readValue(json, Map.class);
             Map<String, Double> tags = (Map<String, Double>) res.get("tags");
-            return tags;
+
+            // 映射结果集
+            Map<String, Double> mappedTags = new HashMap<>();
+            Map<String, Integer> tagNums = new HashMap<>();
+
+            for(Map.Entry<String, Double> entry : tags.entrySet()){
+                String originalTag = entry.getKey();
+                Double score = entry.getValue();
+
+                // 查找映射
+                List<String> mappedList = findFromLocalMapping(originalTag);
+                if(mappedList.isEmpty()) {
+                    // 本地未命中，调用API获取
+                    mappedList = getSimilarTagByApi(originalTag);
+                }
+
+                if(!mappedList.isEmpty()) {
+                    for(String mappedTag : mappedList) {
+                        mappedTags.merge(mappedTag, score, Double::sum);
+                        // 记录次数
+                        if(tagNums.containsKey(mappedTag)) {
+                            // 不存在则加入map中
+                            tagNums.put(mappedTag, 1);
+                        } else {
+                            tagNums.merge(mappedTag, 1, Integer::sum);
+                        }
+                    }
+                }
+            }
+
+            // 概率修正
+            for(Map.Entry<String, Double> entry : mappedTags.entrySet()) {
+                String originalTag = entry.getKey();
+                Double score = entry.getValue();
+
+                // 计算概率平均值
+                mappedTags.put(originalTag, (score/ tagNums.get(originalTag)));
+            }
+
+            return mappedTags;
         }
     }
 
@@ -50,7 +93,7 @@ public class TagServiceImpl implements TagService {
         for(Map.Entry<String, Double> entry : tags.entrySet()) {
             String tag = entry.getKey();
             double prob = entry.getValue();
-            if(prob < GlobalConfig.TAG_PROBILITY) continue;
+            if(prob < GlobalConfig.TAG_PROBABILITY) continue;
 
             // 进行 tagMap 中概率值的更新
             tagMap.compute(tag, (k, v)-> {
@@ -58,10 +101,9 @@ public class TagServiceImpl implements TagService {
                 v.update(prob);
                 return v;
             });
-
-            // 删除最终结果中平均概率小于阈值的 tag
-            tagMap.entrySet().removeIf(e -> e.getValue().getAvgProbability() < GlobalConfig.TAG_FINAL_PROB);
         }
+        // 删除最终结果中平均概率小于阈值的 tag
+        tagMap.entrySet().removeIf(e -> e.getValue().getAvgProbability() < GlobalConfig.TAG_FINAL_PROB);
     }
 
     @Override
@@ -163,5 +205,92 @@ public class TagServiceImpl implements TagService {
 
         // 加权平均
         return (total_probability/tag_number);
+    }
+
+//    @Override
+//    public void parseToPixivTags(Map<String, TagInfo> tagMap) throws IOException{
+//        // TODO: 目前思路：优先查找本地映射，未命中则通过api获取
+//        for (Map.Entry<String, TagInfo> entry : tagMap.entrySet()) {
+//            String tag = entry.getKey();
+//            String keyTag = toLocalMappingKey(tag);
+//
+//            // 尝试本地映射
+//            List<String> mappingTag = findFromLocalMapping(keyTag);
+//            // 未找到, 尝试映射
+//            if(mappingTag.isEmpty()){
+//                mappingTag = getSimilarTagByApi(keyTag);
+//            }
+//
+//
+//        }
+//
+//    }
+
+    @Override
+    public List<String> getSimilarTagByApi(String tag) throws IOException{
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(GlobalConfig.HOST, GlobalConfig.PORT));
+
+        OkHttpClient client = new OkHttpClient.Builder()
+                .proxy(proxy)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build();
+
+        // 构建请求
+        Request request = new Request.Builder()
+                .url(GlobalConfig.SEARCH_API_PRE + tag + GlobalConfig.SEARCH_API_SUF)
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+                .addHeader("Cookie", GlobalConfig.COOKIE)
+                .addHeader("Referer", "https://www.pixiv.net/")
+                .addHeader("Accept", "application/json, text/plain, */*")
+                .build();
+
+        // 发送请求并获取响应
+        try (Response response = client.newCall(request).execute()) {
+            if(!response.isSuccessful()){
+                throw new RuntimeException("请求失败，状态码：" + response.code());
+            }
+
+            String responseText = response.body().string();
+            if(responseText == null || responseText.isEmpty()){
+                throw new RuntimeException("响应内容为空");
+            }
+            System.out.println(responseText);
+
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(responseText);
+            JsonNode candidates = root.get("candidates");
+
+            List<String> tags = new ArrayList<>();
+            if(candidates != null && candidates.isArray()) {
+                for (JsonNode node : candidates) {
+                    // 寻找目标 tag_translation 字段, 获取对应的 tag_name
+                    JsonNode translationNode = node.get("tag_translation");
+                    if(translationNode != null && tag.equalsIgnoreCase(translationNode.asText())) {
+                        tags.add(node.get("tag_name").asText());
+                    }
+                }
+            }
+
+            return tags;
+        }
+    }
+
+    @Override
+    public List<String> findFromLocalMapping(String tag) {
+        // 返回查找到的值，如果没有，则返回空list
+        List<String> tags = new ArrayList<>();
+
+
+
+
+        return tags;
+    }
+
+    // 将 tag 中的_换成空格
+    private String toLocalMappingKey(String tag){
+        if(tag == null) return null;
+
+        return tag.replace("_", " ");
     }
 }

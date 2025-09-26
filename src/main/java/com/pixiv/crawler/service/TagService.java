@@ -7,7 +7,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-// TODO: 在图形化界面需要提供修改用api，需可视化
+// TODO: 在图形化界面需要提供修改用 api，需可视化
+// TODO：在生成偏好的过程中，没有实现 tagMap 的更新，同时需要使用 tag 的映射，很有可能在处理图像阶段就需要对 tag 进行转换
 public interface TagService {
     // 调用推理api
     public Map<String, Double> getTags(File imageFile) throws IOException;
@@ -24,4 +25,10 @@ public interface TagService {
 
     // 计算 tag 相似度
     public double calculateTagSimilarity(List<String> tags, Map<String, TagInfo> tagMap);
+    // 用户偏好中 tag 语义转换，映射为蓝p最相关的词条
+//    public void parseToPixivTags(Map<String, TagInfo> tagMap) throws IOException;
+    // 通过p站搜索api获取相近tag
+    public List<String> getSimilarTagByApi(String tag) throws IOException;
+    // 本地 tag 映射
+    public List<String> findFromLocalMapping(String tag);
 }

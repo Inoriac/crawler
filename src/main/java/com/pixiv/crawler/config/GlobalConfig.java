@@ -16,7 +16,7 @@ public class GlobalConfig {
 
     // 各队列的选取倾向概率
     public static double TOP1W_SELECTION_PROBABILITY = 0.25;
-    public static double TOP5K_SELECTION_PROBABILITY = 0.4;
+    public static double TOP5K_SELECTION_PROBABILITY = 0.3;
     public static double TOP3K_SELECTION_PROBABILITY = 0.3;
     public static double TOP1K_SELECTION_PROBABILITY = 0.15;
 
@@ -75,12 +75,19 @@ public class GlobalConfig {
     // 图片识别tag服务相关
     public static int TAG_SERVICE_PORT = 8000;  // 本地tag识别服务端口
     public static double TAG_SERVICE_THRESHOLD = 0.35;  // 控制tag识别的效果，0.35为佳
-    public static String TAG_SERVICE_URL_LOCAL = "http://127.0.0.1:" + TAG_SERVICE_PORT + "/predict?threshold=" + TAG_SERVICE_THRESHOLD;
     public static String TAG_SERVICE_URL_REMOTE = "";   // 远程api调用 留空，目前没有找到可调用的稳定免费api
-    public static double TAG_PROBILITY = 0.5;
-    public static double TAG_FINAL_PROB = 0.4;
-    public static String TAG_SERVICE_JSON_NAME = "tags.json";
-    public static int TAG_SERVICE_JSON_FILE_MAX_NUMBER = 10;
+    public static double TAG_PROBABILITY = 0.5; // 选用tag的最低出现概率值
+    public static double TAG_FINAL_PROB = 0.4;  // 持久化 tagMap 中tag的最低概率值
+    public static String TAG_SERVICE_JSON_NAME = "tags.json";   // 用户持久化偏好文件名
+    public static int TAG_SERVICE_JSON_FILE_MAX_NUMBER = 10;    // 最大持久化备份数
+    public static String SEARCH_API_PRE = "https://www.pixiv.net/rpc/cps.php?keyword="; // url 前缀
+    public static String SEARCH_API_SUF = "&lang=zh";   // url 后缀
+    public static double SEARCH_API_INTERVAL = 0.1; // 使用搜索api的间隔
+
+    public static String TAG_SERVICE_URL_LOCAL = "http://127.0.0.1:" + TAG_SERVICE_PORT + "/predict?threshold=" + TAG_SERVICE_THRESHOLD;    // 本地服务请求地址
+    public static  String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";    // 日榜作品获取地址
+
+
     // 验证概率总和是否为1
     public static boolean validateProbabilities() {
         double sum = TOP1W_SELECTION_PROBABILITY + TOP5K_SELECTION_PROBABILITY + 

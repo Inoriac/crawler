@@ -21,8 +21,7 @@ import java.util.stream.Collectors;
  */
 public class PixivCrawler {
     private Downloader downloader;
-    private static final String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";
-    
+
     public PixivCrawler() {
         this.downloader = new Downloader();
     }
@@ -37,7 +36,7 @@ public class PixivCrawler {
         System.out.println("尝试访问排行榜页面...");
 
         // 访问 Pixiv 排行榜页面
-        Document document = Jsoup.connect(PIXIV_RANKING_URL)
+        Document document = Jsoup.connect(GlobalConfig.PIXIV_RANKING_URL)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
                 .header("Cookie", GlobalConfig.COOKIE)
                 .proxy(proxy)
