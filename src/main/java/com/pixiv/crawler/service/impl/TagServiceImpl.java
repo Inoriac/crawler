@@ -1,5 +1,6 @@
 package com.pixiv.crawler.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pixiv.crawler.config.GlobalConfig;
@@ -9,6 +10,7 @@ import okhttp3.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.text.SimpleDateFormat;
@@ -16,8 +18,9 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class TagServiceImpl implements TagService {
-    private OkHttpClient client;
-    private ObjectMapper mapper;
+    private final OkHttpClient client;
+    private final ObjectMapper mapper;
+    private static Map<String, List<String>> localMapping;
 
     public TagServiceImpl(){
         this.client = new OkHttpClient();
@@ -26,11 +29,37 @@ public class TagServiceImpl implements TagService {
 
     @Override
     public Map<String, Double> getTags(File imageFile) throws IOException {
+        // 根据文件扩展名确定正确的MediaType
+        String fileName = imageFile.getName().toLowerCase();
+        String mediaType;
+        if (fileName.endsWith(".png")) {
+            mediaType = "image/png";
+        } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+            mediaType = "image/jpeg";
+        } else if (fileName.endsWith(".gif")) {
+            mediaType = "image/gif";
+        } else if (fileName.endsWith(".webp")) {
+            mediaType = "image/webp";
+        } else {
+            // 默认使用jpeg，但记录警告
+            mediaType = "image/jpeg";
+            System.out.println("【TagService】警告：未知图片格式 " + fileName + "，使用默认jpeg格式");
+        }
+        
+        RequestBody fileBody = RequestBody.create(
+                imageFile,
+                MediaType.parse(mediaType)
+        );
+
         RequestBody body = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("file", imageFile.getName(),
-                        RequestBody.create(imageFile, MediaType.parse("image/jpeg")))
+                .addFormDataPart("file", imageFile.getName(), fileBody)
                 .build();
+
+        // 添加调试信息
+        System.out.println("【TagService】上传图片: " + imageFile.getName() +
+                          ", 大小: " + imageFile.length() + " bytes, " +
+                          "MediaType: " + mediaType);
 
         // 创建请求
         Request request = new Request.Builder()
@@ -49,7 +78,7 @@ public class TagServiceImpl implements TagService {
             Map<String, Integer> tagNums = new HashMap<>();
 
             for(Map.Entry<String, Double> entry : tags.entrySet()){
-                String originalTag = entry.getKey();
+                String originalTag = toLocalMappingKey(entry.getKey()); // key 形式归一化
                 Double score = entry.getValue();
 
                 // 查找映射
@@ -207,25 +236,6 @@ public class TagServiceImpl implements TagService {
         return (total_probability/tag_number);
     }
 
-//    @Override
-//    public void parseToPixivTags(Map<String, TagInfo> tagMap) throws IOException{
-//        // TODO: 目前思路：优先查找本地映射，未命中则通过api获取
-//        for (Map.Entry<String, TagInfo> entry : tagMap.entrySet()) {
-//            String tag = entry.getKey();
-//            String keyTag = toLocalMappingKey(tag);
-//
-//            // 尝试本地映射
-//            List<String> mappingTag = findFromLocalMapping(keyTag);
-//            // 未找到, 尝试映射
-//            if(mappingTag.isEmpty()){
-//                mappingTag = getSimilarTagByApi(keyTag);
-//            }
-//
-//
-//        }
-//
-//    }
-
     @Override
     public List<String> getSimilarTagByApi(String tag) throws IOException{
         Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(GlobalConfig.HOST, GlobalConfig.PORT));
@@ -278,13 +288,8 @@ public class TagServiceImpl implements TagService {
 
     @Override
     public List<String> findFromLocalMapping(String tag) {
-        // 返回查找到的值，如果没有，则返回空list
-        List<String> tags = new ArrayList<>();
-
-
-
-
-        return tags;
+        loadMapping();
+        return localMapping.getOrDefault(tag, Collections.emptyList());
     }
 
     // 将 tag 中的_换成空格
@@ -292,5 +297,24 @@ public class TagServiceImpl implements TagService {
         if(tag == null) return null;
 
         return tag.replace("_", " ");
+    }
+
+    // 懒加载，第一次调用时加载 mapping
+    private void loadMapping(){
+        if (localMapping != null) return;   // 已加载 跳过
+        synchronized (TagServiceImpl.class) {
+            try {
+                InputStream inputStream = TagServiceImpl.class.getResourceAsStream(GlobalConfig.LOCAL_MAPPING_URL);
+                if(inputStream != null) {
+                    localMapping = mapper.readValue(inputStream, new TypeReference<Map<String, List<String>>>() {});
+                    System.out.println("【TagService】成功载入mapping.json");
+                } else {
+                    System.out.println("【TagService】mapping.json路径配置有误");
+                }
+            } catch (Exception e) {
+                System.out.println("【TagService】" + e.getMessage());
+                localMapping = Collections.emptyMap();
+            }
+        }
     }
 }

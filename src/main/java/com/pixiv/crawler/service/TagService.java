@@ -25,8 +25,6 @@ public interface TagService {
 
     // 计算 tag 相似度
     public double calculateTagSimilarity(List<String> tags, Map<String, TagInfo> tagMap);
-    // 用户偏好中 tag 语义转换，映射为蓝p最相关的词条
-//    public void parseToPixivTags(Map<String, TagInfo> tagMap) throws IOException;
     // 通过p站搜索api获取相近tag
     public List<String> getSimilarTagByApi(String tag) throws IOException;
     // 本地 tag 映射

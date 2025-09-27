@@ -86,6 +86,7 @@ public class GlobalConfig {
 
     public static String TAG_SERVICE_URL_LOCAL = "http://127.0.0.1:" + TAG_SERVICE_PORT + "/predict?threshold=" + TAG_SERVICE_THRESHOLD;    // 本地服务请求地址
     public static  String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";    // 日榜作品获取地址
+    public static String LOCAL_MAPPING_URL = "/mapping.json"; // 本地映射用json路径
 
 
     // 验证概率总和是否为1
