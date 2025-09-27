@@ -86,6 +86,7 @@ public class TagServiceImpl implements TagService {
                 if(mappedList.isEmpty()) {
                     // 本地未命中，调用API获取
                     mappedList = getSimilarTagByApi(originalTag);
+                    Thread.sleep(100);
                 }
 
                 if(!mappedList.isEmpty()) {
@@ -112,6 +113,8 @@ public class TagServiceImpl implements TagService {
             }
 
             return mappedTags;
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -224,7 +227,9 @@ public class TagServiceImpl implements TagService {
 
         // 更新 tagInfo
         for(String tag : tags){
+            // 没有匹配，则进行惩罚
             if(!tagMap.containsKey(tag)){
+                weightedSum -= GlobalConfig.PUNISHMENT;
                 continue;
             }
             // 获取对应tag的信息
@@ -282,8 +287,10 @@ public class TagServiceImpl implements TagService {
                 for (JsonNode node : candidates) {
                     // 寻找目标 tag_translation 字段, 获取对应的 tag_name
                     JsonNode translationNode = node.get("tag_translation");
-                    if(translationNode != null && tag.equalsIgnoreCase(translationNode.asText())) {
-                        tags.add(node.get("tag_name").asText());
+                    JsonNode tagNameNode = node.get("tag_name");
+                    // 匹配 tag_name 或者是 translation
+                    if(translationNode != null && (tag.equalsIgnoreCase(translationNode.asText()) || tag.equalsIgnoreCase(tagNameNode.asText()))) {
+                        tags.add(tagNameNode.asText());
                     }
                 }
             }

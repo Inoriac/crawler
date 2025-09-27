@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 // TODO: 在图形化界面需要提供修改用 api，需可视化
-// TODO：在生成偏好的过程中，没有实现 tagMap 的更新，同时需要使用 tag 的映射，很有可能在处理图像阶段就需要对 tag 进行转换
 public interface TagService {
     // 调用推理api
     public Map<String, Double> getTags(File imageFile) throws IOException;
@@ -16,6 +15,7 @@ public interface TagService {
     public void processImage(File imageFile, Map<String, TagInfo> tagMap) throws IOException;
     // 批量处理图片
     public void processImages(List<File> imageFiles, Map<String, TagInfo> tagMap) throws IOException;
+
     // 保存 tagmap 为 json 文件
     public void saveToJson(Map<String, TagInfo> tagMap) throws IOException;
     // 加载 json 文件到 tagmap
