@@ -219,21 +219,27 @@ public class TagServiceImpl implements TagService {
 
     @Override
     public double calculateTagSimilarity(List<String> tags, Map<String, TagInfo> tagMap) {
-        int tag_number = 0;             // 符合偏好的tag数量
-        double total_probability = 0;   // 总概率值
+        int tagNumber = 0;             // 符合偏好的tag数量
+        double weightedSum = 0;   // 总概率值
 
+        // 更新 tagInfo
         for(String tag : tags){
             if(!tagMap.containsKey(tag)){
                 continue;
             }
             // 获取对应tag的信息
             TagInfo tagInfo = tagMap.get(tag);
-            tag_number += tagInfo.getCount();
-            total_probability += tagInfo.getAvgProbability() * tagInfo.getCount();
+            tagNumber += tagInfo.getCount();
+            weightedSum += tagInfo.getAvgProbability() * tagInfo.getCount();
+            tagMap.put(tag, tagInfo);
         }
 
+        if (tagNumber == 0) return 0.0; // 没有匹配的tag
+
         // 加权平均
-        return (total_probability/tag_number);
+        double avg = weightedSum/tagNumber;
+        // 平方：强化高分
+        return Math.pow(avg, 2);
     }
 
     @Override
