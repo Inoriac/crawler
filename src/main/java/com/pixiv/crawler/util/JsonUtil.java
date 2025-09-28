@@ -1,16 +1,20 @@
 package com.pixiv.crawler.util;
 
 import com.pixiv.crawler.config.GlobalConfig;
+import com.pixiv.crawler.model.CharacterTagHolder;
 import com.pixiv.crawler.model.PixivImage;
+import com.pixiv.crawler.model.TagMapHolder;
+import com.pixiv.crawler.service.TagService;
+import com.pixiv.crawler.service.impl.TagServiceImpl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,6 +22,134 @@ import java.util.regex.Pattern;
 // TODO: 对于 Pattern与Matcher 可能需要手动销毁对象
 public class JsonUtil {
     private static final Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", GlobalConfig.PORT));
+    private static final Random random = new Random(GlobalConfig.SEED);
+    private static Boolean isFirst = false;
+    /**
+     * 根据pid获取完整的PixivImage对象
+     * 这是一个通用的方法，整合了从API获取作品信息、tags、收藏数、URL等所有功能
+     *
+     * @param pid 作品ID
+     * @return PixivImage对象，如果获取失败返回null
+     */
+    public static PixivImage getImageInfoById(String pid) {
+        try {
+            // 创建HTTP客户端
+            OkHttpClient client = new OkHttpClient.Builder()
+                    .proxy(proxy)
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .build();
+
+            // 构建API请求
+            String apiUrl = "https://www.pixiv.net/ajax/illust/" + pid;
+            Request request = new Request.Builder()
+                    .url(apiUrl)
+                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+                    .addHeader("Cookie", GlobalConfig.COOKIE)
+                    .addHeader("Referer", "https://www.pixiv.net/artworks/" + pid)
+                    .addHeader("X-Requested-With", "XMLHttpRequest")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                    .build();
+
+            // 发送请求
+            Response response = client.newCall(request).execute();
+
+            if (!response.isSuccessful()) {
+                System.out.println("【JsonUtil】API请求失败，状态码: " + response.code());
+                return null;
+            }
+
+            String responseText = response.body().string();
+            if (responseText == null || responseText.isEmpty()) {
+                System.out.println("【JsonUtil】API响应为空");
+                return null;
+            }
+
+            // 创建PixivImage对象
+            PixivImage image = new PixivImage();
+            image.setId(pid);
+
+            // 解析基本信息
+            parseBasicInfo(responseText, image);
+
+            // 相似度计算,仅用于非首次获取图片
+            if(!isFirst) {
+                TagService tagService = new TagServiceImpl();
+                double v = tagService.calculateTagSimilarity(image.getTags());
+
+                if(random.nextDouble() > v) {
+                    return null;
+                }
+            }
+
+            return image;
+        } catch (Exception e) {
+            System.out.println("【JsonUtil】获取作品信息失败: " + e.getMessage());
+            if (e.getMessage().contains("handshake") || e.getMessage().contains("connection")) {
+                System.out.println("【JsonUtil】检测到网络连接问题，建议检查网络状态或代理设置");
+            }
+            return null;
+        }
+    }
+
+    // 提供重载，用于处理第一次调用，避免第一次调用引起的图片被排除
+    public static PixivImage getImageInfoById(String pid, boolean first) {
+        if (first) isFirst = first;
+        PixivImage image = getImageInfoById(pid);
+        isFirst = false;
+        return image;
+    }
+
+    /**
+     * 解析单个作品的基本信息 标题/作者/收藏数/url/pageCount
+     */
+    public static void parseBasicInfo(String responseText, PixivImage image) {
+        try {
+            Pattern idPattern = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher idMatcher = idPattern.matcher(responseText);
+            if (idMatcher.find()) {
+                image.setId(idMatcher.group(1));
+            } else {
+                image.setId(null);
+            }
+
+            // 提取标题
+            Pattern titlePattern = Pattern.compile("\"title\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher titleMatcher = titlePattern.matcher(responseText);
+            if (titleMatcher.find()) {
+                image.setTitle(titleMatcher.group(1));
+            } else {
+                image.setTitle("未知标题");
+            }
+
+            // 提取作者
+            Pattern userPattern = Pattern.compile("\"userName\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher userMatcher = userPattern.matcher(responseText);
+            if (userMatcher.find()) {
+                image.setArtist(userMatcher.group(1));
+            } else {
+                image.setArtist("未知作者");
+            }
+            // 提取收藏数
+            extractBookmarkCount(responseText, image);
+
+            // 构造下载 url
+            constructUrl(responseText, image);
+
+            // 提取 pageCount
+            extractPageCount(responseText, image);
+
+            // 解析tags信息
+            List<String> tags = parseTags(responseText);
+            image.setTags(tags);
+
+            // 检测R-18和漫画
+            detectContentFlags(tags, image);
+
+        } catch (Exception e) {
+            System.out.println("【JsonUtil】提取基本信息失败: " + e.getMessage());
+        }
+    }
 
     /**
      * 从JSON响应中解析推荐图片完整信息
@@ -76,11 +208,14 @@ public class JsonUtil {
             for (String illustObj : illustObjects) {
                 if (count >= maxImages) break;
 
-                PixivImage image = parseIllustObject(illustObj);
-                if (image != null) {
+                PixivImage image = new PixivImage();
+                parseBasicInfo(illustObj, image);
+                if (image != null && image.getId() != null && !image.getId().isEmpty()) {
                     recommendImages.add(image);
                     count++;
                     System.out.println("【相关推荐】解析作品: " + image.getId() + " - " + image.getTitle());
+                } else {
+                    System.out.println("【相关推荐】跳过无效作品 (ID为空或解析失败)");
                 }
             }
 
@@ -126,178 +261,10 @@ public class JsonUtil {
     }
 
     /**
-     * 解析单个作品对象
-     */
-    public static PixivImage parseIllustObject(String illustObj) {
-        try {
-            PixivImage image = new PixivImage();
-
-            // 提取ID
-            Pattern idPattern = Pattern.compile("\"id\"\\s*:\\s*\"(\\d+)\"");
-            Matcher idMatcher = idPattern.matcher(illustObj);
-            if (idMatcher.find()) {
-                image.setId(idMatcher.group(1));
-            } else {
-                System.out.println("【相关推荐】解析失败：未找到ID");
-                return null;
-            }
-
-            // 提取标题
-            Pattern titlePattern = Pattern.compile("\"title\"\\s*:\\s*\"([^\"]+)\"");
-            Matcher titleMatcher = titlePattern.matcher(illustObj);
-            if (titleMatcher.find()) {
-                image.setTitle(titleMatcher.group(1));
-            } else {
-                image.setTitle("未知标题");
-            }
-
-            // 提取作者
-            Pattern userPattern = Pattern.compile("\"userName\"\\s*:\\s*\"([^\"]+)\"");
-            Matcher userMatcher = userPattern.matcher(illustObj);
-            if (userMatcher.find()) {
-                image.setArtist(userMatcher.group(1));
-            } else {
-                image.setArtist("未知作者");
-            }
-
-            // 提取创建日期并构造下载URL
-            Pattern datePattern = Pattern.compile("\"createDate\"\\s*:\\s*\"([^\"]+)\"");
-            Matcher dateMatcher = datePattern.matcher(illustObj);
-
-            if (dateMatcher.find()) {
-                String createDate = dateMatcher.group(1);
-                // 使用createDate构造下载URL
-                try {
-                    ZonedDateTime dateTime = ZonedDateTime.parse(createDate);
-                    String datePath = String.format("%04d/%02d/%02d/%02d/%02d/%02d",
-                            dateTime.getYear(), dateTime.getMonthValue(), dateTime.getDayOfMonth(),
-                            dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
-
-                    String downloadUrl = "https://i.pximg.net/img-original/img/" + datePath + "/" + image.getId() + "_p0.jpg";
-                    image.setUrl(downloadUrl);
-                    System.out.println("【相关推荐】构造下载URL: " + downloadUrl);
-                } catch (Exception e) {
-                    // 如果日期解析失败，使用备用URL
-                    String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
-                    image.setUrl(fallbackUrl);
-                    System.out.println("【相关推荐】日期解析失败，使用备用URL: " + fallbackUrl);
-                }
-            } else {
-                // 如果没有createDate，使用备用URL
-                String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
-                image.setUrl(fallbackUrl);
-                System.out.println("【相关推荐】无createDate，使用备用URL: " + fallbackUrl);
-            }
-
-            // 确保URL不为null
-            if (image.getUrl() == null) {
-                String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
-                image.setUrl(fallbackUrl);
-                System.out.println("【相关推荐】URL为null，设置备用URL: " + fallbackUrl);
-            }
-
-            // 收藏数通过API获取，这里先设为0，后续会更新
-            image.setBookmarkCount(0);
-
-            // 解析tags并检测R-18
-            List<String> tags = parseTags(illustObj);
-            image.setTags(tags);
-            
-            // R-18检测：检查第一个标签是否为R-18
-            if (tags != null && !tags.isEmpty()) {
-                String firstTag = tags.get(0);
-                if ("R-18".equals(firstTag) || "R18".equals(firstTag)) {
-                    image.setR18(true);
-                    System.out.println("【R-18检测】作品 " + image.getId() + " 被标记为R-18 (标签: " + firstTag + ")");
-                }
-            }
-            
-            // 漫画检测：检查tags中是否包含漫画关键词
-            if (tags != null && !tags.isEmpty()) {
-                for (String tag : tags) {
-                    if (tag.contains("漫画")) {
-                        image.setManga(true);
-                        System.out.println("【漫画检测】作品 " + image.getId() + " 被标记为漫画 (标签: " + tag + ")");
-                        break;
-                    }
-                }
-            }
-
-            return image;
-
-        } catch (Exception e) {
-            System.out.println("【相关推荐】解析作品对象失败: " + e.getMessage());
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    /**
-     * 从Illust对象中提取作品ID
-     * @param illustObj Illust对象的JSON字符串
-     * @return 作品ID，如果提取失败则返回null
-     */
-    public static String extractIdFromIllustObj(String illustObj) {
-        try {
-            // 使用正则表达式提取ID，确保正确处理引号
-            Pattern idPattern = Pattern.compile("\"id\"\\s*:\\s*\"(\\d+)\"");
-            Matcher idMatcher = idPattern.matcher(illustObj);
-            if (idMatcher.find()) {
-                return idMatcher.group(1); // 返回第一个捕获组，即数字ID
-            }
-            return null;
-        } catch (Exception e) {
-            System.out.println("【JsonUtil】从Illust对象中提取ID失败: " + e.getMessage());
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    /**
-     * 提取tags字段的内容
-     */
-    private static String extractTagContentFromIllust(String illustObj, int startPos) {
-        int bracketCount = 0;
-        boolean inArray = false;
-        int endPos = startPos;
-        
-        for (int i = startPos; i < illustObj.length(); i++) {
-            char c = illustObj.charAt(i);
-            
-            if (c == '[' && !inArray) {
-                inArray = true;
-                bracketCount = 1;
-            } else if (c == '[' && inArray) {
-                bracketCount++;
-            } else if (c == ']' && inArray) {
-                bracketCount--;
-                if (bracketCount == 0) {
-                    endPos = i;
-                    break;
-                }
-            } else if (c == '{' && !inArray) {
-                inArray = true;
-                bracketCount = 1;
-            } else if (c == '{' && inArray) {
-                bracketCount++;
-            } else if (c == '}' && inArray) {
-                bracketCount--;
-                if (bracketCount == 0) {
-                    endPos = i;
-                    break;
-                }
-            }
-        }
-        
-        if (endPos > startPos) {
-            return illustObj.substring(startPos, endPos + 1);
-        }
-        
-        return null;
-    }
-    
-    /**
      * 解析作品对象中的tags字段
+     * 支持两种格式：
+     * 1. Popular作品格式：body.tags.tags数组，每个对象包含tag属性
+     * 2. 相关推荐格式：直接包含tags数组
      */
     public static List<String> parseTags(String illustObj) {
         if (illustObj == null || illustObj.isEmpty()) {
@@ -305,162 +272,110 @@ public class JsonUtil {
         }
         
         try {
-            // 从json中提取tags字段
-            String tagsContent = "";
-
-            String[] possibleTagFields = {
-                    "\"tags\":", "\"tag\":", "\"tagList\":", "\"tag_list\":",
-                    "\"illustTags\":", "\"illust_tags\":", "\"userTags\":", "\"user_tags\":"
-            };
-
-            for (String tagField : possibleTagFields) {
-                int tagStart = illustObj.indexOf(tagField);
-                if (tagStart != -1) {
-                    tagsContent = extractTagContentFromIllust(illustObj, tagStart + tagField.length());
-                }
+            // 首先尝试解析Popular作品格式：body.tags.tags数组
+            List<String> popularTags = parsePopularFormatTags(illustObj);
+            if (!popularTags.isEmpty()) {
+                System.out.println("【标签解析】使用Popular格式解析，找到 " + popularTags.size() + " 个标签");
+                return popularTags;
             }
-
-            if (tagsContent == null || tagsContent.isEmpty()) {
-                return new ArrayList<>();
+            
+            // 如果Popular格式解析失败，尝试相关推荐格式：直接tags数组
+            List<String> recommendTags = parseRecommendFormatTags(illustObj);
+            if (!recommendTags.isEmpty()) {
+                System.out.println("【标签解析】使用相关推荐格式解析，找到 " + recommendTags.size() + " 个标签");
+                return recommendTags;
             }
-
-            List<String> tags = new ArrayList<>();
-
-            // 移除方括号
-            if (tagsContent.startsWith("[") && tagsContent.endsWith("]")) {
-                tagsContent = tagsContent.substring(1, tagsContent.length() - 1);
-            }
-
-            // 分割标签
-            String[] tagArray = tagsContent.split(",");
-            for (String tag : tagArray) {
-                tag = tag.trim();
-                // 移除引号
-                if ((tag.startsWith("\"") && tag.endsWith("\"")) ||
-                        (tag.startsWith("'") && tag.endsWith("'"))) {
-                    tag = tag.substring(1, tag.length() - 1);
-                }
-                if (!tag.isEmpty()) {
-                    tags.add(tag);
-                }
-            }
-
-            return tags;
+            
+            System.out.println("【标签解析】未找到任何tags结构");
+            return new ArrayList<>();
             
         } catch (Exception e) {
             System.out.println("【标签解析】解析tags时发生错误: " + e.getMessage());
+            e.printStackTrace();
             return new ArrayList<>();
         }
     }
-
+    
     /**
-     * 根据pid获取完整的PixivImage对象
-     * 这是一个通用的方法，整合了从API获取作品信息、tags、收藏数、URL等所有功能
-     * 
-     * @param pid 作品ID
-     * @return PixivImage对象，如果获取失败返回null
+     * 解析Popular作品格式的tags：body.tags.tags数组，每个对象包含tag属性
      */
-    public static PixivImage getImageInfoById(String pid) {
-        if (pid == null || pid.isEmpty()) {
-            System.out.println("【JsonUtil】作品ID为空");
-            return null;
-        }
-
+    private static List<String> parsePopularFormatTags(String illustObj) {
+        List<String> tags = new ArrayList<>();
+        
         try {
-            // 创建HTTP客户端
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .proxy(proxy)
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(30, TimeUnit.SECONDS)
-                    .build();
-
-            // 构建API请求
-            String apiUrl = "https://www.pixiv.net/ajax/illust/" + pid;
-            Request request = new Request.Builder()
-                    .url(apiUrl)
-                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
-                    .addHeader("Cookie", GlobalConfig.COOKIE)
-                    .addHeader("Referer", "https://www.pixiv.net/artworks/" + pid)
-                    .addHeader("X-Requested-With", "XMLHttpRequest")
-                    .addHeader("Accept", "application/json, text/plain, */*")
-                    .build();
-
-            // 发送请求
-            Response response = client.newCall(request).execute();
+            // 查找 "tags": { ... "tags": [ ... ] ... }
+            Pattern nestedTagsPattern = Pattern.compile("\"tags\"\\s*:\\s*\\{[^}]*\"tags\"\\s*:\\s*\\[([^\\]]+)\\]");
+            Matcher matcher = nestedTagsPattern.matcher(illustObj);
             
-            if (!response.isSuccessful()) {
-                System.out.println("【JsonUtil】API请求失败，状态码: " + response.code());
-                return null;
+            if (matcher.find()) {
+                String tagsArrayContent = matcher.group(1);
+                System.out.println("【标签解析】找到Popular格式tags数组内容: " + tagsArrayContent.substring(0, Math.min(100, tagsArrayContent.length())) + "...");
+                
+                // 解析数组中的每个对象，提取tag属性
+                Pattern tagObjectPattern = Pattern.compile("\\{[^}]*\"tag\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher tagMatcher = tagObjectPattern.matcher(tagsArrayContent);
+                
+                while (tagMatcher.find()) {
+                    String tag = tagMatcher.group(1);
+                    if (tag != null && !tag.trim().isEmpty()) {
+                        String trimmedTag = tag.trim();
+                        // 处理Unicode转义字符
+                        String unescapedTag = unescapeUnicode(trimmedTag);
+                        tags.add(unescapedTag);
+                        System.out.println("【标签解析】提取到Popular格式标签: [" + unescapedTag + "] (长度: " + unescapedTag.length() + ")");
+                    }
+                }
             }
-
-            String responseText = response.body().string();
-            if (responseText == null || responseText.isEmpty()) {
-                System.out.println("【JsonUtil】API响应为空");
-                return null;
-            }
-
-            // 创建PixivImage对象
-            PixivImage image = new PixivImage();
-            image.setId(pid);
-
-            // 解析基本信息
-            parseBasicInfo(responseText, image);
-            
-            // 解析tags信息
-            List<String> tags = parseTags(responseText);
-            image.setTags(tags);
-            
-            // 检测R-18和漫画
-            detectContentFlags(tags, image);
-            
-            // 提取pageCount并构造下载URL
-            extractPageCountAndConstructUrl(responseText, image);
-
-            System.out.println("【JsonUtil】成功获取作品信息: " + pid + " - " + image.getTitle());
-            return image;
-
         } catch (Exception e) {
-            System.out.println("【JsonUtil】获取作品信息失败: " + e.getMessage());
-            return null;
+            System.out.println("【标签解析】解析Popular格式tags失败: " + e.getMessage());
         }
+        
+        return tags;
     }
-
+    
     /**
-     * 解析基本信息（标题、作者、收藏数等）
+     * 解析相关推荐格式的tags：直接包含tags数组
      */
-    private static void parseBasicInfo(String responseText, PixivImage image) {
+    private static List<String> parseRecommendFormatTags(String illustObj) {
+        List<String> tags = new ArrayList<>();
+        
         try {
-            // 提取标题
-            Pattern titlePattern = Pattern.compile("\"title\"\\s*:\\s*\"([^\"]+)\"");
-            Matcher titleMatcher = titlePattern.matcher(responseText);
-            if (titleMatcher.find()) {
-                image.setTitle(titleMatcher.group(1));
-            } else {
-                image.setTitle("未知标题");
+            // 查找直接的 "tags": [ ... ] 格式
+            Pattern directTagsPattern = Pattern.compile("\"tags\"\\s*:\\s*\\[([^\\]]+)\\]");
+            Matcher matcher = directTagsPattern.matcher(illustObj);
+            
+            if (matcher.find()) {
+                String tagsArrayContent = matcher.group(1);
+                System.out.println("【标签解析】找到相关推荐格式tags数组内容: " + tagsArrayContent.substring(0, Math.min(100, tagsArrayContent.length())) + "...");
+                
+                // 分割标签字符串
+                String[] tagArray = tagsArrayContent.split(",");
+                for (String tag : tagArray) {
+                    tag = tag.trim();
+                    // 移除引号
+                    if ((tag.startsWith("\"") && tag.endsWith("\"")) ||
+                            (tag.startsWith("'") && tag.endsWith("'"))) {
+                        tag = tag.substring(1, tag.length() - 1);
+                    }
+                    if (!tag.isEmpty()) {
+                        // 处理Unicode转义字符
+                        String unescapedTag = unescapeUnicode(tag);
+                        tags.add(unescapedTag);
+                        System.out.println("【标签解析】提取到相关推荐格式标签: [" + unescapedTag + "] (长度: " + unescapedTag.length() + ")");
+                    }
+                }
             }
-
-            // 提取作者
-            Pattern userPattern = Pattern.compile("\"userName\"\\s*:\\s*\"([^\"]+)\"");
-            Matcher userMatcher = userPattern.matcher(responseText);
-            if (userMatcher.find()) {
-                image.setArtist(userMatcher.group(1));
-            } else {
-                image.setArtist("未知作者");
-            }
-
-            // 提取收藏数
-            int bookmarkCount = extractBookmarkCount(responseText);
-            image.setBookmarkCount(bookmarkCount);
-
         } catch (Exception e) {
-            System.out.println("【JsonUtil】解析基本信息失败: " + e.getMessage());
+            System.out.println("【标签解析】解析相关推荐格式tags失败: " + e.getMessage());
         }
+        
+        return tags;
     }
 
     /**
      * 提取收藏数
      */
-    private static int extractBookmarkCount(String responseText) {
+    private static void extractBookmarkCount(String responseText, PixivImage image) {
         try {
             // 尝试多种可能的收藏数字段
             String[] patterns = {
@@ -474,13 +389,13 @@ public class JsonUtil {
                 Pattern p = Pattern.compile(pattern);
                 Matcher m = p.matcher(responseText);
                 if (m.find()) {
-                    return Integer.parseInt(m.group(1));
+                    image.setBookmarkCount(Integer.parseInt(m.group(1)));
                 }
             }
         } catch (Exception e) {
             System.out.println("【JsonUtil】提取收藏数失败: " + e.getMessage());
+            image.setBookmarkCount(-1);
         }
-        return 0;
     }
 
     /**
@@ -509,16 +424,11 @@ public class JsonUtil {
     }
 
     /**
-     * 提取pageCount并构造下载URL
+     * 构造下载URL
      */
-    private static void extractPageCountAndConstructUrl(String responseText, PixivImage image) {
+    private static void constructUrl(String responseText, PixivImage image) {
         try {
-            // 提取 pageCount
-            int pageCount = Math.min(extractPageCount(responseText), GlobalConfig.MAX_IMAGES_PER_WORK);
-            image.setPageCount(pageCount);
-            System.out.println("【JsonUtil】作品 " + image.getId() + " 共有 " + pageCount + " 页");
-            
-            // 从urls.original获取URL
+            // 首先尝试从urls.original获取URL
             Pattern originalUrlPattern = Pattern.compile("\"original\"\\s*:\\s*\"([^\"]+)\"");
             Matcher originalUrlMatcher = originalUrlPattern.matcher(responseText);
             
@@ -526,17 +436,55 @@ public class JsonUtil {
                 String originalUrl = originalUrlMatcher.group(1);
                 image.setUrl(originalUrl);
                 System.out.println("【JsonUtil】使用原始URL: " + originalUrl);
+                return;
             }
+            
+            // 如果没有找到original URL，尝试使用createDate构造URL
+            Pattern datePattern = Pattern.compile("\"createDate\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher dateMatcher = datePattern.matcher(responseText);
+
+            if (dateMatcher.find()) {
+                String createDate = dateMatcher.group(1);
+                // 使用createDate构造下载URL
+                try {
+                    java.time.ZonedDateTime dateTime = java.time.ZonedDateTime.parse(createDate);
+                    String datePath = String.format("%04d/%02d/%02d/%02d/%02d/%02d",
+                            dateTime.getYear(), dateTime.getMonthValue(), dateTime.getDayOfMonth(),
+                            dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
+
+                    String downloadUrl = "https://i.pximg.net/img-original/img/" + datePath + "/" + image.getId() + "_p0.jpg";
+                    image.setUrl(downloadUrl);
+                    System.out.println("【JsonUtil】构造下载URL: " + downloadUrl);
+                    return;
+                } catch (Exception e) {
+                    System.out.println("【JsonUtil】日期解析失败: " + e.getMessage());
+                }
+            }
+            
+            // 如果以上都失败，使用备用URL
+            String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
+            image.setUrl(fallbackUrl);
+            System.out.println("【JsonUtil】使用备用URL: " + fallbackUrl);
+            
         } catch (Exception e) {
             // 如果构造URL失败，使用备用URL
             String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
             image.setUrl(fallbackUrl);
             System.out.println("【JsonUtil】构造URL失败，使用备用URL: " + fallbackUrl);
         }
+        
+        // 确保URL不为null
+        if (image.getUrl() == null) {
+            String fallbackUrl = "https://embed.pixiv.net/artwork.php?illust_id=" + image.getId();
+            image.setUrl(fallbackUrl);
+            System.out.println("【JsonUtil】URL为null，设置备用URL: " + fallbackUrl);
+        }
     }
-    
-    // 提取 pageCount
-    private static int extractPageCount(String responseText) {
+
+    /**
+     * 提取 pageCount
+     */
+    private static void extractPageCount(String responseText, PixivImage image) {
         try {
             String pattern ="\"pageCount\"\\s*:\\s*(\\d+)";
 
@@ -545,13 +493,48 @@ public class JsonUtil {
             if (m.find()) {
                 int pageCount = Integer.parseInt(m.group(1));
                 System.out.println("【JsonUtil】提取到pageCount: " + pageCount);
-                return pageCount;
+                image.setPageCount(Math.min(pageCount, GlobalConfig.MAX_IMAGES_PER_WORK));
             }
 
         } catch (Exception e) {
             System.out.println("【JsonUtil】提取pageCount失败: " + e.getMessage());
+            image.setPageCount(1);
         }
-        System.out.println("【JsonUtil】未找到pageCount，默认为1页");
-        return 1;
+    }
+
+    /**
+     * 将Unicode转义字符转换为正常字符
+     */
+    private static String unescapeUnicode(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+
+        try {
+            StringBuilder sb = new StringBuilder();
+            int i = 0;
+            while (i < str.length()) {
+                if (i < str.length() - 5 && str.charAt(i) == '\\' && str.charAt(i + 1) == 'u') {
+                    // 找到 \\uXXXX 格式
+                    String hex = str.substring(i + 2, i + 6);
+                    try {
+                        int codePoint = Integer.parseInt(hex, 16);
+                        sb.append((char) codePoint);
+                        i += 6;
+                    } catch (NumberFormatException e) {
+                        // 如果不是有效的十六进制，保持原样
+                        sb.append(str.charAt(i));
+                        i++;
+                    }
+                } else {
+                    sb.append(str.charAt(i));
+                    i++;
+                }
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            System.out.println("【Unicode转义】处理失败: " + e.getMessage());
+            return str; // 如果处理失败，返回原字符串
+        }
     }
 }

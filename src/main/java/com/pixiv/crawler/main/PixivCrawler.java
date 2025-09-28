@@ -1,7 +1,7 @@
 package com.pixiv.crawler.main;
 
 import com.pixiv.crawler.config.GlobalConfig;
-import com.pixiv.crawler.service.Downloader;
+import com.pixiv.crawler.service.impl.Downloader;
 import com.pixiv.crawler.util.DateUtils;
 import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.util.RecommendUtil;
@@ -21,8 +21,7 @@ import java.util.stream.Collectors;
  */
 public class PixivCrawler {
     private Downloader downloader;
-    private static final String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";
-    
+
     public PixivCrawler() {
         this.downloader = new Downloader();
     }
@@ -37,7 +36,7 @@ public class PixivCrawler {
         System.out.println("尝试访问排行榜页面...");
 
         // 访问 Pixiv 排行榜页面
-        Document document = Jsoup.connect(PIXIV_RANKING_URL)
+        Document document = Jsoup.connect(GlobalConfig.PIXIV_RANKING_URL)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
                 .header("Cookie", GlobalConfig.COOKIE)
                 .proxy(proxy)
@@ -118,16 +117,22 @@ public class PixivCrawler {
         downloader.startDownload(images, "日榜爬取", rankingSavePath);
     }
 
+    // 提供重载，兼容现有方法
+    public void downloadRecommendImages(PixivImage startImage, String baseUrl) throws Exception {
+        downloadRecommendImages(startImage, baseUrl, null);
+    }
+
     /**
      * 从指定图片ID出发，爬取相关图片，按收藏数分档，并提交下载任务
-     * @param startPid  起始图片 pid
+     * @param startImage  起始图片 pid
      */
-    public void downloadRecommendImages(String startPid, String baseUrl) throws Exception {
+    public void downloadRecommendImages(PixivImage startImage, String baseUrl, String tag) throws Exception {
         // TODO： 此处需要增加统计 各个类别下载多少张，一共下载多少张
-
         Set<String> visited = new HashSet<>();  // 防止选取同样的图片作为起始
-        Queue<String> queue = new LinkedList<>();
-        queue.add(startPid);
+
+        // 当前层的待选起始图片
+        List<PixivImage> currentStartImages = new ArrayList<>();
+        currentStartImages.add(startImage);
 
         // 优先队列，按照收藏数降序
         PriorityQueue<PixivImage> top1w = new PriorityQueue<>(Comparator.comparingInt(PixivImage::getBookmarkCount).reversed());
@@ -138,25 +143,35 @@ public class PixivCrawler {
         // 存储所有推荐图片的完整信息，用于后续选择
         Map<String, PixivImage> allRecommendImages = new HashMap<>();
 
-        // 当前层的待选起始图片
-        List<String> currentStartImages = new ArrayList<>();
-        currentStartImages.add(startPid);
-
         int depth = 0;
-        while (!queue.isEmpty() && depth < GlobalConfig.MAX_DEPTH) {
+        while (!currentStartImages.isEmpty() && depth < GlobalConfig.MAX_DEPTH) {
             System.out.println("【第" + (depth + 1) + "层】开始处理，起始图片数量: " + currentStartImages.size());
 
             // 下一层的起始图片候选
             List<String> nextStartCandidates = new ArrayList<>();
 
-            for(String pid : currentStartImages){
+            for(PixivImage image : currentStartImages){
+                // 跳过null对象
+                if (image == null) {
+                    System.out.println("【警告】发现null的PixivImage对象，跳过处理");
+                    continue;
+                }
+                
+                String pid = image.getId();
+                if (pid == null || pid.isEmpty()) {
+                    System.out.println("【警告】发现ID为空的PixivImage对象，跳过处理");
+                    continue;
+                }
+
                 // 跳过已爬取
                 if (visited.contains(pid)) continue;
                 visited.add(pid);
 
-                // 获取图片详情页
-                PixivImage image = JsonUtil.getImageInfoById(pid);
-                if (image == null) continue;
+                // 跳过漫画作品
+                if(image.isManga() && GlobalConfig.MANGA_EXCLUDE_ENABLED) continue;
+
+                // 跳过 tag 不符合
+                if(tag != null && !(image.getTags().contains(tag))) continue;
 
                 // 仅 depth=0 时需要进行一次分类
                 if(depth == 0){
@@ -181,11 +196,17 @@ public class PixivCrawler {
                 }
 
                 // 获取相关推荐图片完整信息
-                List<PixivImage> recImages = RecommendUtil.getRecommendImagesByPid(pid, GlobalConfig.RECOMMEND_MAX_IMAGE); // 获取20张推荐图片
+                List<PixivImage> recImages = RecommendUtil.getRecommendImagesByPid(pid, GlobalConfig.PER_RECOMMEND_MAX_IMAGE); // 获取20张推荐图片
                 System.out.println("【相关推荐】获取到 " + recImages.size() + " 张推荐图片");
                 
                 // 将推荐图片直接添加到对应的队列中，并收集ID用于下一轮
                 for (PixivImage recImage : recImages) {
+                    // 跳过 tag 不符合的图片
+                    if(tag != null && !(recImage.getTags().contains(tag))) {
+                        System.out.println("【tag】" + recImage.getId() + "因tag不符合被排除");
+                        continue;
+                    }
+
                     nextStartCandidates.add(recImage.getId());
                     allRecommendImages.put(recImage.getId(), recImage); // 保存完整信息
                     
@@ -200,7 +221,7 @@ public class PixivCrawler {
                     }
                     
                     // 直接分类推荐图片到对应队列（排除漫画作品）
-                    if (recImage.isManga()) {
+                    if (recImage.isManga() && GlobalConfig.MANGA_EXCLUDE_ENABLED) {
                         System.out.println("【分类】" + recImage.getId() + " -> 漫画作品，已排除 (收藏数: " + recImage.getBookmarkCount() + ")");
                         continue;
                     }
@@ -329,9 +350,9 @@ public class PixivCrawler {
     }
 
     // 从候选图片中选择下一轮的起始图片
-    private List<String> selectNextStartImages(List<String> candidates, Set<String> visited,
+    private List<PixivImage> selectNextStartImages(List<String> candidates, Set<String> visited,
                                              Map<String, PixivImage> allRecommendImages) throws Exception {
-        List<String> selected = new ArrayList<>();
+        List<PixivImage> selected = new ArrayList<>();
         Random random = new Random();
 
         // 过滤已访问的图片
@@ -409,9 +430,20 @@ public class PixivCrawler {
             System.out.println("【调试】第" + selectionAttempts + "次选择尝试，结果: " + selectedPid);
 
             // 选到图片且未重复
-            if(selectedPid != null && !selected.contains(selectedPid)){
-                selected.add(selectedPid);
-                System.out.println("【调试】成功选择图片: " + selectedPid);
+            if(selectedPid != null){
+                // 检查是否已经选择了这个ID的图片
+                boolean alreadySelected = selected.stream()
+                    .anyMatch(img -> img != null && selectedPid.equals(img.getId()));
+                
+                if (!alreadySelected) {
+                    PixivImage image = JsonUtil.getImageInfoById(selectedPid);
+                    if (image != null) {
+                        selected.add(image);
+                        System.out.println("【调试】成功选择图片: " + selectedPid);
+                    } else {
+                        System.out.println("【警告】获取图片信息失败，跳过: " + selectedPid);
+                    }
+                }
             }
         }
 

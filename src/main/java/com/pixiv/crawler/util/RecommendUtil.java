@@ -33,7 +33,7 @@ public class RecommendUtil {
         List<PixivImage> recommendImages = new ArrayList<>();
 
         String ajaxUrl = "https://www.pixiv.net/ajax/illust/" + pid + "/recommend/init";
-        String queryParams = "limit=18&lang=zh";
+        String queryParams = "limit=" + GlobalConfig.PER_RECOMMEND_MAX_IMAGE + "&lang=zh";
 
         System.out.println("【相关推荐】使用推荐API端点: " + ajaxUrl);
 

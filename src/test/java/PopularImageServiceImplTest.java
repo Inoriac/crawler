@@ -2,14 +2,14 @@ import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.main.PixivCrawler;
 import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.model.SavePath;
-import com.pixiv.crawler.service.Downloader;
-import com.pixiv.crawler.service.PopularImageService;
+import com.pixiv.crawler.service.impl.Downloader;
+import com.pixiv.crawler.service.impl.PopularImageServiceImpl;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
-public class PopularImageServiceTest {
+
+public class PopularImageServiceImplTest {
     private static volatile boolean stopFlag = false;
     private static Downloader downloader = new Downloader();
     @Test
@@ -27,18 +27,20 @@ public class PopularImageServiceTest {
             SavePath.cleanDownloadPaths();
         }));
 
-        PopularImageService popularImageService = new PopularImageService();
+        PopularImageServiceImpl popularImageServiceImpl = new PopularImageServiceImpl();
         PixivCrawler pixivCrawler = new PixivCrawler();
 
         try{
-            String tag = "スズラン(アークナイツ)";
-            List<PixivImage> popularImages = popularImageService.getPopularImagesByTag(tag);
+//            String tag = "スズラン(アークナイツ)";
+            String tag = "伊落マリー";
+            List<PixivImage> popularImages = popularImageServiceImpl.getPopularImagesByTag(tag);
 
             String savePath = GlobalConfig.POPULAR_BASE_PATH + "/" + tag;
             downloader.startDownload(popularImages, "热门作品" , savePath);
 
+            // 根据获取到的热门图片，依次获取下面的推荐图片
             for (int i = 0; i < popularImages.size(); i++) {
-                pixivCrawler.downloadRecommendImages(popularImages.get(i).getId(), savePath + "/recommend");
+                pixivCrawler.downloadRecommendImages(popularImages.get(i), savePath + "/recommend", tag);
             }
 
         }catch (Exception e){

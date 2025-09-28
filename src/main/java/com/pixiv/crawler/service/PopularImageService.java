@@ -1,61 +1,22 @@
 package com.pixiv.crawler.service;
 
-import com.pixiv.crawler.config.GlobalConfig;
 import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.util.JsonUtil;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
-import java.net.InetSocketAddress;
-import java.net.Proxy;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-// TODO：若查询到的数组为空，可能意味着搜索tag有误或者是该tag下作品较少，前者直接返回相关tag，后者需要提供一个全新的方法
-public class PopularImageService {
-    public List<PixivImage> getPopularImagesByTag(String tag) throws Exception{
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(GlobalConfig.HOST, GlobalConfig.PORT));
-
-        String searchUrl = "https://www.pixiv.net/ajax/search/artworks/" + tag + "?word=sea&order=date_d&mode=all&p=1&csw=0&s_mode=s_tag&type=all&lang=zh";
-
-        OkHttpClient client = new OkHttpClient.Builder()
-                .proxy(proxy)
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .build();
-
-        // 构建请求
-        Request request = new Request.Builder()
-                .url(searchUrl)
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
-                .addHeader("Cookie", GlobalConfig.COOKIE)
-                .addHeader("Referer", "https://www.pixiv.net/")
-                .addHeader("Accept", "application/json, text/plain, */*")
-                .build();
-
-        // 发送请求并获取响应
-        try (Response response = client.newCall(request).execute()) {
-            if(!response.isSuccessful()){
-                throw new RuntimeException("请求失败，状态码：" + response.code());
-            }
-
-            String responseText = response.body().string();
-            if(responseText == null || responseText.isEmpty()){
-                throw new RuntimeException("响应内容为空");
-            }
-
-            return parsePopularWorksFromJson(responseText);
-        }
-    }
+public interface PopularImageService {
+    public List<PixivImage> getPopularImagesByTag(String tag) throws Exception;
 
     /**
      * 从JSON响应中解析热门作品信息
      * @param jsonResponse JSON响应字符串
      * @return 热门作品列表
      */
-    private List<PixivImage> parsePopularWorksFromJson(String jsonResponse) {
+    default List<PixivImage> parsePopularWorksFromJson(String jsonResponse) {
         List<PixivImage> popularImages = new ArrayList<>();
 
         try {
@@ -97,24 +58,24 @@ public class PopularImageService {
             // 提取popular对象内容
             String popularContent = jsonResponse.substring(popularStart + 10, popularEnd - 1);
             System.out.println("【热门作品】popular对象长度: " + popularContent.length());
-            
+
             // 调试：输出popular对象的前500个字符
             String popularPreview = popularContent.length() > 500 ? popularContent.substring(0, 500) + "..." : popularContent;
             System.out.println("【热门作品】popular对象预览: " + popularPreview);
-            
+
             // 调试：检查是否包含recent和permanent字段
             boolean hasRecent = popularContent.contains("\"recent\":");
             boolean hasPermanent = popularContent.contains("\"permanent\":");
             System.out.println("【热门作品】包含recent字段: " + hasRecent);
             System.out.println("【热门作品】包含permanent字段: " + hasPermanent);
 
-            // 解析recent数组
-            List<PixivImage> recentImages = parsePopularArray(popularContent, "recent");
-            popularImages.addAll(recentImages);
-
             // 解析permanent数组
             List<PixivImage> permanentImages = parsePopularArray(popularContent, "permanent");
             popularImages.addAll(permanentImages);
+
+            // 解析recent数组
+            List<PixivImage> recentImages = parsePopularArray(popularContent, "recent");
+            popularImages.addAll(recentImages);
 
             System.out.println("【热门作品】JSON解析完成，共找到 " + popularImages.size() + " 个热门作品");
 
@@ -138,26 +99,18 @@ public class PopularImageService {
         try {
             // 查找数组的开始位置 - 修复正则表达式
             String arrayStartPattern = "\"" + arrayName + "\":\\[";
-            int arrayStart = popularContent.indexOf(arrayStartPattern);
+            int arrayStart = popularContent.indexOf("\"" + arrayName + "\":");
             if (arrayStart == -1) {
-                System.out.println("【热门作品】未找到" + arrayName + "数组，尝试其他方式查找");
-                // 尝试更宽松的查找方式
-                arrayStart = popularContent.indexOf("\"" + arrayName + "\":");
-                if (arrayStart == -1) {
-                    System.out.println("【热门作品】完全未找到" + arrayName + "字段");
-                    return images;
-                }
-                // 找到冒号后的第一个 [ 符号
-                int bracketStart = popularContent.indexOf("[", arrayStart);
-                if (bracketStart == -1) {
-                    System.out.println("【热门作品】未找到" + arrayName + "数组的开始括号");
-                    return images;
-                }
-                arrayStart = bracketStart;
-            } else {
-                // 如果找到了完整模式，调整到 [ 的位置
-                arrayStart = popularContent.indexOf("[", arrayStart);
+                System.out.println("【热门作品】完全未找到" + arrayName + "字段");
+                return images;
             }
+            // 找到冒号后的第一个 [ 符号
+            int bracketStart = popularContent.indexOf("[", arrayStart);
+            if (bracketStart == -1) {
+                System.out.println("【热门作品】未找到" + arrayName + "数组的开始括号");
+                return images;
+            }
+            arrayStart = bracketStart;
 
             // 找到数组的结束位置
             int bracketCount = 0;
@@ -194,16 +147,24 @@ public class PopularImageService {
             System.out.println("【热门作品】" + arrayName + "数组找到 " + illustObjects.size() + " 个作品对象");
 
             for (String illustObj : illustObjects) {
-                // 先从JSON对象中提取ID
-                String pid = JsonUtil.extractIdFromIllustObj(illustObj);
+                // 使用正则表达式提取ID，确保正确处理引号
+                String pid = null;
+                Pattern idPattern = Pattern.compile("\"id\"\\s*:\\s*\"(\\d+)\"");
+                Matcher idMatcher = idPattern.matcher(illustObj);
+                if (idMatcher.find()) {
+                    pid = idMatcher.group(1); // 返回第一个捕获组，即数字ID
+                }
+
                 if (pid != null) {
                     // 使用JsonUtil中的getImageInfoById方法获取完整信息
                     PixivImage image = JsonUtil.getImageInfoById(pid);
-                    if (image.getBookmarkCount() >= 500) {
-                        images.add(image);
-                        System.out.println("【热门作品】解析" + arrayName + "作品: " + image.getId() + " - " + image.getTitle());
-                    } else {
-                        System.out.println("【热门作品】收藏数小于500，舍弃");
+                    if (image != null && image.getId() != null) {
+                        if (image.getBookmarkCount() >= 500) {
+                            images.add(image);
+                            System.out.println("【热门作品】解析" + arrayName + "作品: " + image.getId() + " - " + image.getTitle());
+                        } else {
+                            System.out.println("【热门作品】收藏数小于500，舍弃 (ID: " + pid + ", 收藏数: " + image.getBookmarkCount() + ")");
+                        }
                     }
                 } else {
                     System.out.println("【热门作品】无法从JSON对象中提取ID");
