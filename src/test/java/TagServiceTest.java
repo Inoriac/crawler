@@ -1,6 +1,8 @@
 import com.pixiv.crawler.config.GlobalConfig;
+import com.pixiv.crawler.model.CharacterTagHolder;
 import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.model.TagInfo;
+import com.pixiv.crawler.model.TagMapHolder;
 import com.pixiv.crawler.service.TagService;
 import com.pixiv.crawler.service.impl.TagServiceImpl;
 import com.pixiv.crawler.util.JsonUtil;
@@ -36,7 +38,7 @@ public class TagServiceTest {
     public void testResponse() throws IOException {
 
         String tag = "skirt";
-        Map<String, TagInfo> tagMap = new HashMap<>();
+        Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
 
         // 测试远程api 已通过
 //        List<String> tags = tagService.getSimilarTagByApi(tag);
@@ -59,25 +61,25 @@ public class TagServiceTest {
 //        tags.forEach((k, v) -> System.out.println(k + " -> " + v));
 
         // 测试图片处理方法
-        tagService.processImage(file, tagMap);
+        tagService.processImage(file);
         tagMap.forEach((k, v) -> System.out.println(k + " -> ( " + v.getCount() + ", " + v.getAvgProbability() + " )"));
 
         PixivImage image = JsonUtil.getImageInfoById("135611059");
 
-        double v = tagService.calculateTagSimilarity(image.getTags(), tagMap);
+        double v = tagService.calculateTagSimilarity(image.getTags());
 
         System.out.println("该图片匹配度为：" + v);
     }
     @Test
     public void testSaveToJson() throws IOException {
         // 创建测试数据
-        Map<String, TagInfo> tagMap = new HashMap<>();
+        Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
         tagMap.put("1girl", new TagInfo(0.8, 5));
         tagMap.put("anime", new TagInfo(0.7, 3));
         tagMap.put("cute", new TagInfo(0.9, 8));
 
         // 保存到JSON
-        tagService.saveToJson(tagMap);
+        tagService.saveToJson();
 
         // 验证文件是否创建
         File jsonFile = new File(GlobalConfig.TAG_SERVICE_JSON_NAME);
@@ -89,10 +91,10 @@ public class TagServiceTest {
     @Test
     public void testLoadFromJson() throws IOException {
         // 先创建测试数据并保存
-        Map<String, TagInfo> originalTagMap = new HashMap<>();
-        originalTagMap.put("1girl", new TagInfo(0.8, 5));
-        originalTagMap.put("anime", new TagInfo(0.7, 3));
-        tagService.saveToJson(originalTagMap);
+        Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
+        tagMap.put("1girl", new TagInfo(0.8, 5));
+        tagMap.put("anime", new TagInfo(0.7, 3));
+        tagService.saveToJson();
 
         // 从JSON加载
         Map<String, TagInfo> loadedTagMap = tagService.loadFromJson();
@@ -115,21 +117,21 @@ public class TagServiceTest {
     @Test
     public void testJsonRoundTrip() throws IOException {
         // 测试完整的保存-加载循环
-        Map<String, TagInfo> originalTagMap = new HashMap<>();
-        originalTagMap.put("test_tag", new TagInfo(0.95, 10));
-        originalTagMap.put("another_tag", new TagInfo(0.6, 2));
+        Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
+        tagMap.put("test_tag", new TagInfo(0.95, 10));
+        tagMap.put("another_tag", new TagInfo(0.6, 2));
 
         // 保存
-        tagService.saveToJson(originalTagMap);
+        tagService.saveToJson();
 
         // 加载
         Map<String, TagInfo> loadedTagMap = tagService.loadFromJson();
 
         // 验证数据完整性
-        assert loadedTagMap.size() == originalTagMap.size() : "标签数量应该一致";
-        for (String key : originalTagMap.keySet()) {
+        assert loadedTagMap.size() == tagMap.size() : "标签数量应该一致";
+        for (String key : tagMap.keySet()) {
             assert loadedTagMap.containsKey(key) : "应该包含标签: " + key;
-            TagInfo original = originalTagMap.get(key);
+            TagInfo original = tagMap.get(key);
             TagInfo loaded = loadedTagMap.get(key);
             assert Math.abs(original.getAvgProbability() - loaded.getAvgProbability()) < 0.001 : "概率应该一致";
             assert original.getCount() == loaded.getCount() : "计数应该一致";

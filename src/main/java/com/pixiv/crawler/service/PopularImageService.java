@@ -165,8 +165,6 @@ public interface PopularImageService {
                         } else {
                             System.out.println("【热门作品】收藏数小于500，舍弃 (ID: " + pid + ", 收藏数: " + image.getBookmarkCount() + ")");
                         }
-                    } else {
-                        System.out.println("【热门作品】获取作品信息失败，跳过 (ID: " + pid + ")");
                     }
                 } else {
                     System.out.println("【热门作品】无法从JSON对象中提取ID");

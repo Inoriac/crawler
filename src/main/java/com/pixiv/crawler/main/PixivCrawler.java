@@ -128,7 +128,6 @@ public class PixivCrawler {
      */
     public void downloadRecommendImages(PixivImage startImage, String baseUrl, String tag) throws Exception {
         // TODO： 此处需要增加统计 各个类别下载多少张，一共下载多少张
-
         Set<String> visited = new HashSet<>();  // 防止选取同样的图片作为起始
 
         // 当前层的待选起始图片

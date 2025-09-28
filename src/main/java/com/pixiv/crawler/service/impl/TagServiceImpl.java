@@ -4,7 +4,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pixiv.crawler.config.GlobalConfig;
+import com.pixiv.crawler.model.CharacterTagHolder;
 import com.pixiv.crawler.model.TagInfo;
+import com.pixiv.crawler.model.TagMapHolder;
 import com.pixiv.crawler.service.TagService;
 import okhttp3.*;
 
@@ -119,8 +121,9 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
-    public void processImage(File imageFile, Map<String, TagInfo> tagMap) throws IOException {
+    public void processImage(File imageFile) throws IOException {
         Map<String, Double> tags = getTags(imageFile);
+        Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
 
         for(Map.Entry<String, Double> entry : tags.entrySet()) {
             String tag = entry.getKey();
@@ -139,24 +142,48 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
-    public void processImages(List<File> imageFiles, Map<String, TagInfo> tagMap)  throws IOException{
+    public void processImages(List<File> imageFiles)  throws IOException{
         for(File imageFile : imageFiles){
-            processImage(imageFile, tagMap);
+            processImage(imageFile);
         }
     }
 
     @Override
-    public void saveToJson(Map<String, TagInfo> tagMap) throws IOException {
-        // 方便以后扩展，此处的处理是用于控制输出的 json 结构，此处暂时不使用，节省内存开销
-//        Map<String, Map<String, Object>> output = new HashMap<>();
-//        for(Map.Entry<String, TagInfo> entry : tagMap.entrySet()) {
-//            Map<String, Object> info = new HashMap<>();
-//            info.put("argProbability", entry.getValue().getAvgProbability());
-//            info.put("count", entry.getValue().getCount());
-//            output.put(entry.getKey(), info);
-//        }
-//        mapper.writerWithDefaultPrettyPrinter().writeValue(new File(filename), output);
+    public List<String> getPreferCharacterTags() throws IOException{
+        // 尝试打开 filename 文件
+        File file = new File(GlobalConfig.TAG_SERVICE_JSON_NAME_CHARACTER);
+        if(!file.exists()) {
+            System.out.println("【TagService】未找到用户偏好角色tag信息");
+            return new ArrayList<>();
+        }
+        return mapper.readValue(file, new TypeReference<List<String>>() {});
+    }
 
+    @Override
+    public void saveCharacterTagToJson(List<String> characters) {
+        File file = new File(GlobalConfig.TAG_SERVICE_JSON_NAME_CHARACTER);
+
+        // 如果旧文件存在，进行备份
+        if(file.exists()){
+            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            File backupFile = new File("character_tags_backup_" + timestamp);
+            if(file.renameTo(backupFile)){
+                System.out.println("【TagService】旧角色偏好已备份：" + backupFile.getName());
+            } else {
+                System.out.println("【TagService】备份失败，仍继续使用新文件");
+            }
+        }
+
+        try{
+            mapper.writerWithDefaultPrettyPrinter().writeValue(file, characters);
+            System.out.println("【TagService】新文件已保存：" + file.getName());
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void saveToJson(){
         File file = new File(GlobalConfig.TAG_SERVICE_JSON_NAME);
 
         // 如果旧文件存在，进行备份
@@ -171,7 +198,7 @@ public class TagServiceImpl implements TagService {
         }
 
         try{
-            mapper.writerWithDefaultPrettyPrinter().writeValue(file, tagMap);
+            mapper.writerWithDefaultPrettyPrinter().writeValue(file, TagMapHolder.getInstance().getTagMap());
             System.out.println("【TagService】新文件已保存：" + file.getName());
         } catch (IOException e){
             e.printStackTrace();
@@ -221,22 +248,32 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
-    public double calculateTagSimilarity(List<String> tags, Map<String, TagInfo> tagMap) {
+    public double calculateTagSimilarity(List<String> tags) {
+        Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
+        List<String> characterTags = CharacterTagHolder.getInstance().getCharacterTags();
+
+        // 若没有用户偏好，则默认全取
+        if(tagMap.isEmpty()) return 1;
+
         int tagNumber = 0;             // 符合偏好的tag数量
         double weightedSum = 0;   // 总概率值
 
-        // 更新 tagInfo
+        // 计算匹配度
         for(String tag : tags){
-            // 没有匹配，则进行惩罚
-            if(!tagMap.containsKey(tag)){
+            // 没有匹配词条偏好，则进行惩罚
+            if(!tagMap.containsKey(tag)) {
                 weightedSum -= GlobalConfig.PUNISHMENT;
                 continue;
             }
+            // 匹配角色偏好，则进行奖励
+            if(!characterTags.isEmpty() && characterTags.contains(tag)) {
+                weightedSum += GlobalConfig.REWARD;
+            }
+
             // 获取对应tag的信息
             TagInfo tagInfo = tagMap.get(tag);
             tagNumber += tagInfo.getCount();
             weightedSum += tagInfo.getAvgProbability() * tagInfo.getCount();
-            tagMap.put(tag, tagInfo);
         }
 
         if (tagNumber == 0) return 0.0; // 没有匹配的tag
@@ -244,7 +281,7 @@ public class TagServiceImpl implements TagService {
         // 加权平均
         double avg = weightedSum/tagNumber;
         // 平方：强化高分
-        return Math.pow(avg, 2);
+        return Math.min(0.99, Math.pow(avg, 2));
     }
 
     @Override

@@ -1048,7 +1048,7 @@ public class PixivCrawlerGUI extends Application {
                 });
                 
                 crawler.downloadRecommendImages(
-                    JsonUtil.getImageInfoById(startPidField.getText()),
+                    JsonUtil.getImageInfoById(startPidField.getText(), true),
                     recommendSavePathField.getText()
                 );
                 

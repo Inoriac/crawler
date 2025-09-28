@@ -1,7 +1,11 @@
 package com.pixiv.crawler.util;
 
 import com.pixiv.crawler.config.GlobalConfig;
+import com.pixiv.crawler.model.CharacterTagHolder;
 import com.pixiv.crawler.model.PixivImage;
+import com.pixiv.crawler.model.TagMapHolder;
+import com.pixiv.crawler.service.TagService;
+import com.pixiv.crawler.service.impl.TagServiceImpl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -10,6 +14,7 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,7 +22,8 @@ import java.util.regex.Pattern;
 // TODO: 对于 Pattern与Matcher 可能需要手动销毁对象
 public class JsonUtil {
     private static final Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", GlobalConfig.PORT));
-
+    private static final Random random = new Random(GlobalConfig.SEED);
+    private static Boolean isFirst = false;
     /**
      * 根据pid获取完整的PixivImage对象
      * 这是一个通用的方法，整合了从API获取作品信息、tags、收藏数、URL等所有功能
@@ -26,11 +32,6 @@ public class JsonUtil {
      * @return PixivImage对象，如果获取失败返回null
      */
     public static PixivImage getImageInfoById(String pid) {
-        if (pid == null || pid.isEmpty()) {
-            System.out.println("【JsonUtil】作品ID为空");
-            return null;
-        }
-
         try {
             // 创建HTTP客户端
             OkHttpClient client = new OkHttpClient.Builder()
@@ -71,6 +72,16 @@ public class JsonUtil {
             // 解析基本信息
             parseBasicInfo(responseText, image);
 
+            // 相似度计算,仅用于非首次获取图片
+            if(!isFirst) {
+                TagService tagService = new TagServiceImpl();
+                double v = tagService.calculateTagSimilarity(image.getTags());
+
+                if(random.nextDouble() > v) {
+                    return null;
+                }
+            }
+
             return image;
         } catch (Exception e) {
             System.out.println("【JsonUtil】获取作品信息失败: " + e.getMessage());
@@ -79,6 +90,14 @@ public class JsonUtil {
             }
             return null;
         }
+    }
+
+    // 提供重载，用于处理第一次调用，避免第一次调用引起的图片被排除
+    public static PixivImage getImageInfoById(String pid, boolean first) {
+        if (first) isFirst = first;
+        PixivImage image = getImageInfoById(pid);
+        isFirst = false;
+        return image;
     }
 
     /**
