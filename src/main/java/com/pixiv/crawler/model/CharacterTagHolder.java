@@ -12,8 +12,8 @@ public class CharacterTagHolder {
     private final List<String> characterTags;
 
     private CharacterTagHolder() {
-        TagService tagService = new TagServiceImpl();
         try {
+            TagService tagService = new TagServiceImpl();
             this.characterTags = tagService.getPreferCharacterTags();
         } catch (IOException e) {
             throw new RuntimeException(e);

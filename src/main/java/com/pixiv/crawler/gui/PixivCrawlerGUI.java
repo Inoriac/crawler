@@ -6,6 +6,8 @@ import com.pixiv.crawler.model.PixivImage;
 import com.pixiv.crawler.service.impl.ArtistServiceImpl;
 import com.pixiv.crawler.service.impl.Downloader;
 import com.pixiv.crawler.service.impl.PopularImageServiceImpl;
+import com.pixiv.crawler.service.impl.TagServiceImpl;
+import com.pixiv.crawler.service.TagService;
 import com.pixiv.crawler.util.JsonUtil;
 import com.pixiv.crawler.util.SettingsManager;
 import javafx.application.Application;
@@ -25,11 +27,21 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.Stop;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.util.converter.DoubleStringConverter;
+import javafx.util.converter.IntegerStringConverter;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import com.pixiv.crawler.model.TagInfo;
+import com.pixiv.crawler.model.TagMapHolder;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
@@ -63,6 +75,29 @@ public class PixivCrawlerGUI extends Application {
     private Button artistStartButton;
     private Button artistStopButton;
     
+    // 用户偏好分析功能控件
+    private ListView<File> selectedImagesList;
+    private Button selectImagesButton;
+    private Button clearImagesButton;
+    private Button analyzeButton;
+    private Button stopAnalyzeButton;
+    private ProgressBar analyzeProgressBar;
+    private Label analyzeStatusLabel;
+    
+    // Tag管理功能控件
+    private TableView<TagInfoWrapper> tagTableView;
+    private Button refreshTagsButton;
+    private Button saveTagsButton;
+    private Button deleteTagButton;
+    private Button addTagButton;
+    
+    // 角色词管理功能控件
+    private ListView<String> characterTagsList;
+    private Button refreshCharacterTagsButton;
+    private Button saveCharacterTagsButton;
+    private Button deleteCharacterTagButton;
+    private Button addCharacterTagButton;
+    
     // 通用控件
     // 移除statusLabel和progressBar，因为右侧面板只保留日志区域
     
@@ -71,11 +106,13 @@ public class PixivCrawlerGUI extends Application {
     private volatile boolean isRunning = false;
     private PixivCrawler crawler;
     private Downloader downloader;
+    private TagService tagService;
     
     // 面板切换相关
     private VBox contentArea;
     private VBox functionPanel;
     private VBox settingsPanel;
+    private VBox tagManagementPanel;
     private Label currentModeLabel;
     
     // 日志处理器
@@ -107,6 +144,9 @@ public class PixivCrawlerGUI extends Application {
         
         // 创建设置面板
         this.settingsPanel = createSettingsPanel();
+        
+        // 创建Tag管理面板
+        this.tagManagementPanel = createTagManagementPanel();
         
         // 默认显示功能面板
         this.contentArea.getChildren().add(this.functionPanel);
@@ -160,6 +200,11 @@ public class PixivCrawlerGUI extends Application {
         settingsButton.setPrefWidth(100);
         settingsButton.getStyleClass().add("function-button");
         
+        // Tag管理按钮
+        Button tagManagementButton = new Button("Tag管理");
+        tagManagementButton.setPrefWidth(100);
+        tagManagementButton.getStyleClass().add("function-button");
+        
         // 当前状态标签
         Label currentModeLabel = new Label("当前模式：功能区");
         currentModeLabel.getStyleClass().addAll("mode-label", "black-text");
@@ -171,11 +216,12 @@ public class PixivCrawlerGUI extends Application {
         backgroundButton.getStyleClass().add("background-button");
         backgroundButton.setOnAction(e -> showBackgroundSettings());
         
-        topBar.getChildren().addAll(functionButton, settingsButton, backgroundButton, currentModeLabel);
+        topBar.getChildren().addAll(functionButton, settingsButton, tagManagementButton, backgroundButton, currentModeLabel);
         
         // 按钮事件
         functionButton.setOnAction(e -> showFunctionPanel());
         settingsButton.setOnAction(e -> showSettingsPanel());
+        tagManagementButton.setOnAction(e -> showTagManagementPanel());
         
         return topBar;
     }
@@ -195,14 +241,35 @@ public class PixivCrawlerGUI extends Application {
         TitledPane rankingPane = createRankingPane();
         TitledPane popularPane = createPopularPane();
         TitledPane artistPane = createArtistPane();
+        TitledPane preferencePane = createPreferenceAnalysisPane();
         
-        leftPanel.getChildren().addAll(
+        // 创建内容容器
+        VBox contentContainer = new VBox(15);
+        contentContainer.getChildren().addAll(
             titleLabel,
             recommendPane,
             rankingPane,
             popularPane,
-            artistPane
+            artistPane,
+            preferencePane
         );
+        
+        // 创建滚动面板
+        ScrollPane scrollPane = new ScrollPane(contentContainer);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.getStyleClass().add("left-scroll-pane");
+        
+        // 设置滚动面板样式
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        
+        // 将滚动面板添加到左侧面板
+        leftPanel.getChildren().add(scrollPane);
+        
+        // 让滚动面板占据所有空间
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
         
         return leftPanel;
     }
@@ -231,7 +298,7 @@ public class PixivCrawlerGUI extends Application {
     private VBox createSettingsPanel() {
         VBox settingsPanel = new VBox(15);
         settingsPanel.setPadding(new Insets(20));
-        settingsPanel.getStyleClass().add("settings-panel");
+        settingsPanel.getStyleClass().add("transparent-panel");
         
         // 标题
         Label titleLabel = new Label("系统设置");
@@ -246,6 +313,9 @@ public class PixivCrawlerGUI extends Application {
         
         // 算法设置
         TitledPane algorithmPane = createAlgorithmSettingsPane();
+        
+        // Tag服务设置
+        TitledPane tagServicePane = createTagServiceSettingsPane();
         
         // 路径设置
         TitledPane pathPane = createPathSettingsPane();
@@ -266,6 +336,7 @@ public class PixivCrawlerGUI extends Application {
             networkPane,
             downloadPane,
             algorithmPane,
+            tagServicePane,
             pathPane,
             buttonBox
         );
@@ -355,7 +426,16 @@ public class PixivCrawlerGUI extends Application {
         progressCheckBox.setSelected(GlobalConfig.SHOW_DOWNLOAD_PROGRESS);
         progressCheckBox.getStyleClass().add("settings-checkbox");
         
-        content.getChildren().addAll(threadBox, r18CheckBox, mangaCheckBox, cleanCheckBox, progressCheckBox);
+        // 漫画标签关键词
+        HBox mangaKeywordBox = new HBox(10);
+        TextField mangaKeywordField = new TextField(GlobalConfig.MANGA_TAG_KEYWORD);
+        mangaKeywordField.getStyleClass().add("text-field");
+        mangaKeywordBox.getChildren().addAll(
+            new Label("漫画标签关键词:"),
+            mangaKeywordField
+        );
+        
+        content.getChildren().addAll(threadBox, r18CheckBox, mangaCheckBox, cleanCheckBox, progressCheckBox, mangaKeywordBox);
         
         TitledPane pane = new TitledPane("下载设置", content);
         // 设置TitledPane的样式，使用CSS类
@@ -404,10 +484,94 @@ public class PixivCrawlerGUI extends Application {
             artistField
         );
         
-        content.getChildren().addAll(depthBox, roundBox, recommendBox, artistBox);
+        // 队列处理阈值
+        HBox queueBox = new HBox(10);
+        TextField queueField = new TextField(String.valueOf(GlobalConfig.QUEUE_PROCESS_THRESHOLD));
+        queueField.getStyleClass().add("text-field");
+        queueBox.getChildren().addAll(
+            new Label("队列处理阈值:"),
+            queueField
+        );
+        
+        content.getChildren().addAll(depthBox, roundBox, recommendBox, artistBox, queueBox);
         
         TitledPane pane = new TitledPane("算法设置", content);
         // 设置TitledPane的样式，使用CSS类
+        pane.getStyleClass().add("custom-titled-pane");
+        
+        return pane;
+    }
+    
+    private TitledPane createTagServiceSettingsPane() {
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
+        
+        // Tag服务端口
+        HBox portBox = new HBox(10);
+        TextField portField = new TextField(String.valueOf(GlobalConfig.TAG_SERVICE_PORT));
+        portField.getStyleClass().add("text-field");
+        portBox.getChildren().addAll(
+            new Label("Tag服务端口:"),
+            portField
+        );
+        
+        // Tag识别阈值
+        HBox thresholdBox = new HBox(10);
+        TextField thresholdField = new TextField(String.valueOf(GlobalConfig.TAG_SERVICE_THRESHOLD));
+        thresholdField.getStyleClass().add("text-field");
+        thresholdBox.getChildren().addAll(
+            new Label("Tag识别阈值:"),
+            thresholdField
+        );
+        
+        // Tag最低概率
+        HBox probBox = new HBox(10);
+        TextField probField = new TextField(String.valueOf(GlobalConfig.TAG_PROBABILITY));
+        probField.getStyleClass().add("text-field");
+        probBox.getChildren().addAll(
+            new Label("Tag最低概率:"),
+            probField
+        );
+        
+        // Tag最终概率
+        HBox finalProbBox = new HBox(10);
+        TextField finalProbField = new TextField(String.valueOf(GlobalConfig.TAG_FINAL_PROB));
+        finalProbField.getStyleClass().add("text-field");
+        finalProbBox.getChildren().addAll(
+            new Label("Tag最终概率:"),
+            finalProbField
+        );
+        
+        // 搜索API间隔
+        HBox intervalBox = new HBox(10);
+        TextField intervalField = new TextField(String.valueOf(GlobalConfig.SEARCH_API_INTERVAL));
+        intervalField.getStyleClass().add("text-field");
+        intervalBox.getChildren().addAll(
+            new Label("搜索API间隔(秒):"),
+            intervalField
+        );
+        
+        // 惩罚强度
+        HBox punishmentBox = new HBox(10);
+        TextField punishmentField = new TextField(String.valueOf(GlobalConfig.PUNISHMENT));
+        punishmentField.getStyleClass().add("text-field");
+        punishmentBox.getChildren().addAll(
+            new Label("惩罚强度:"),
+            punishmentField
+        );
+        
+        // 奖励强度
+        HBox rewardBox = new HBox(10);
+        TextField rewardField = new TextField(String.valueOf(GlobalConfig.REWARD));
+        rewardField.getStyleClass().add("text-field");
+        rewardBox.getChildren().addAll(
+            new Label("奖励强度:"),
+            rewardField
+        );
+        
+        content.getChildren().addAll(portBox, thresholdBox, probBox, finalProbBox, intervalBox, punishmentBox, rewardBox);
+        
+        TitledPane pane = new TitledPane("Tag服务设置", content);
         pane.getStyleClass().add("custom-titled-pane");
         
         return pane;
@@ -461,6 +625,17 @@ public class PixivCrawlerGUI extends Application {
         if (currentModeLabel != null) {
             currentModeLabel.setText("当前模式：设置");
         }
+    }
+    
+    private void showTagManagementPanel() {
+        contentArea.getChildren().clear();
+        contentArea.getChildren().add(tagManagementPanel);
+        if (currentModeLabel != null) {
+            currentModeLabel.setText("当前模式：Tag管理");
+        }
+        // 刷新Tag数据和角色词数据
+        refreshTagData();
+        refreshCharacterTagsData();
     }
     
     private void initializeLogHandler() {
@@ -936,6 +1111,176 @@ public class PixivCrawlerGUI extends Application {
         
         return pane;
     }
+    
+    private TitledPane createPreferenceAnalysisPane() {
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
+        
+        // 图片选择区域
+        VBox imageSelectionBox = new VBox(5);
+        Label selectionLabel = new Label("选择图片:");
+        selectionLabel.getStyleClass().addAll("settings-group-label", "black-text");
+        
+        // 图片列表
+        selectedImagesList = new ListView<>();
+        selectedImagesList.setPrefHeight(120);
+        selectedImagesList.getStyleClass().add("text-field");
+        
+        // 选择图片按钮
+        HBox buttonBox1 = new HBox(10);
+        buttonBox1.setAlignment(Pos.CENTER);
+        selectImagesButton = new Button("选择图片");
+        clearImagesButton = new Button("清空列表");
+        buttonBox1.getChildren().addAll(selectImagesButton, clearImagesButton);
+        
+        imageSelectionBox.getChildren().addAll(selectionLabel, selectedImagesList, buttonBox1);
+        
+        // 分析控制区域
+        VBox analysisBox = new VBox(5);
+        Label analysisLabel = new Label("偏好分析:");
+        analysisLabel.getStyleClass().addAll("settings-group-label", "black-text");
+        
+        // 进度条
+        analyzeProgressBar = new ProgressBar(0);
+        analyzeProgressBar.setPrefWidth(200);
+        analyzeProgressBar.setVisible(false);
+        
+        // 状态标签
+        analyzeStatusLabel = new Label("准备就绪");
+        analyzeStatusLabel.getStyleClass().add("black-text");
+        
+        // 分析按钮
+        HBox buttonBox2 = new HBox(10);
+        buttonBox2.setAlignment(Pos.CENTER);
+        analyzeButton = new Button("开始分析");
+        stopAnalyzeButton = new Button("停止分析");
+        stopAnalyzeButton.setDisable(true);
+        buttonBox2.getChildren().addAll(analyzeButton, stopAnalyzeButton);
+        
+        analysisBox.getChildren().addAll(analysisLabel, analyzeProgressBar, analyzeStatusLabel, buttonBox2);
+        
+        content.getChildren().addAll(imageSelectionBox, analysisBox);
+        
+        TitledPane pane = new TitledPane("用户偏好分析", content);
+        pane.getStyleClass().add("custom-titled-pane");
+        
+        return pane;
+    }
+    
+    private VBox createTagManagementPanel() {
+        VBox mainLayout = new VBox(20);
+        mainLayout.setPadding(new Insets(20));
+        mainLayout.getStyleClass().add("transparent-panel");
+        
+        // 标题
+        Label titleLabel = new Label("用户偏好Tag管理");
+        titleLabel.getStyleClass().addAll("settings-title-label", "black-text");
+        titleLabel.setAlignment(Pos.CENTER);
+        
+        // 创建TableView
+        tagTableView = new TableView<>();
+        tagTableView.setPrefHeight(400);
+        tagTableView.setEditable(true);
+        tagTableView.setOpacity(0.3);
+        
+        // 创建列
+        TableColumn<TagInfoWrapper, String> tagNameColumn = new TableColumn<>("Tag名称");
+        tagNameColumn.setCellValueFactory(new PropertyValueFactory<>("tagName"));
+        tagNameColumn.setCellFactory(TextFieldTableCell.forTableColumn());
+        tagNameColumn.setPrefWidth(200);
+        
+        TableColumn<TagInfoWrapper, Double> probabilityColumn = new TableColumn<>("平均概率");
+        probabilityColumn.setCellValueFactory(new PropertyValueFactory<>("avgProbability"));
+        probabilityColumn.setCellFactory(TextFieldTableCell.forTableColumn(new DoubleStringConverter()));
+        probabilityColumn.setPrefWidth(120);
+        
+        TableColumn<TagInfoWrapper, Integer> countColumn = new TableColumn<>("出现次数");
+        countColumn.setCellValueFactory(new PropertyValueFactory<>("count"));
+        countColumn.setCellFactory(TextFieldTableCell.forTableColumn(new IntegerStringConverter()));
+        countColumn.setPrefWidth(120);
+        
+        tagTableView.getColumns().addAll(tagNameColumn, probabilityColumn, countColumn);
+        
+        // 创建水平布局，左侧显示Tag管理，右侧显示角色词管理
+        HBox contentLayout = new HBox(20);
+        
+        // 左侧：Tag管理区域
+        VBox tagManagementBox = new VBox(10);
+        Label tagLabel = new Label("偏好Tag管理");
+        tagLabel.getStyleClass().addAll("settings-group-label", "black-text");
+        tagManagementBox.getChildren().addAll(tagLabel, tagTableView);
+        
+        // 右侧：角色词管理区域
+        VBox characterManagementBox = new VBox(10);
+        Label characterLabel = new Label("角色词偏好管理");
+        characterLabel.getStyleClass().addAll("settings-group-label", "black-text");
+        
+        // 角色词列表
+        characterTagsList = new ListView<>();
+        characterTagsList.setPrefHeight(400);
+        characterTagsList.setPrefWidth(250);
+        
+        characterManagementBox.getChildren().addAll(characterLabel, characterTagsList);
+        
+        contentLayout.getChildren().addAll(tagManagementBox, characterManagementBox);
+        
+        // 按钮区域
+        HBox buttonBox = new HBox(15);
+        buttonBox.setAlignment(Pos.CENTER);
+        
+        refreshTagsButton = new Button("刷新数据");
+        refreshTagsButton.setPrefWidth(100);
+        refreshTagsButton.getStyleClass().add("settings-button");
+        refreshTagsButton.setOnAction(e -> refreshTagData());
+        
+        addTagButton = new Button("添加Tag");
+        addTagButton.setPrefWidth(100);
+        addTagButton.getStyleClass().add("settings-button");
+        addTagButton.setOnAction(e -> addNewTag());
+        
+        deleteTagButton = new Button("删除选中");
+        deleteTagButton.setPrefWidth(100);
+        deleteTagButton.getStyleClass().add("settings-button");
+        deleteTagButton.setOnAction(e -> deleteSelectedTag());
+        
+        saveTagsButton = new Button("保存Tag");
+        saveTagsButton.setPrefWidth(100);
+        saveTagsButton.getStyleClass().add("settings-button");
+        saveTagsButton.setOnAction(e -> saveTagChanges());
+        
+        // 角色词管理按钮
+        refreshCharacterTagsButton = new Button("刷新角色词");
+        refreshCharacterTagsButton.setPrefWidth(100);
+        refreshCharacterTagsButton.getStyleClass().add("settings-button");
+        refreshCharacterTagsButton.setOnAction(e -> refreshCharacterTagsData());
+        
+        addCharacterTagButton = new Button("添加角色词");
+        addCharacterTagButton.setPrefWidth(100);
+        addCharacterTagButton.getStyleClass().add("settings-button");
+        addCharacterTagButton.setOnAction(e -> addNewCharacterTag());
+        
+        deleteCharacterTagButton = new Button("删除角色词");
+        deleteCharacterTagButton.setPrefWidth(100);
+        deleteCharacterTagButton.getStyleClass().add("settings-button");
+        deleteCharacterTagButton.setOnAction(e -> deleteSelectedCharacterTag());
+        
+        saveCharacterTagsButton = new Button("保存角色词");
+        saveCharacterTagsButton.setPrefWidth(100);
+        saveCharacterTagsButton.getStyleClass().add("settings-button");
+        saveCharacterTagsButton.setOnAction(e -> saveCharacterTagsChanges());
+        
+        buttonBox.getChildren().addAll(refreshTagsButton, addTagButton, deleteTagButton, saveTagsButton,
+                                     refreshCharacterTagsButton, addCharacterTagButton, deleteCharacterTagButton, saveCharacterTagsButton);
+        
+        // 说明文本
+        Label infoLabel = new Label("提示：左侧双击单元格可编辑Tag，右侧选择角色词后点击删除按钮可删除");
+        infoLabel.getStyleClass().add("black-text");
+        infoLabel.setAlignment(Pos.CENTER);
+        
+        mainLayout.getChildren().addAll(titleLabel, contentLayout, buttonBox, infoLabel);
+        
+        return mainLayout;
+    }
 
     private VBox createRightPanel() {
         VBox rightPanel = new VBox(15);
@@ -1011,6 +1356,12 @@ public class PixivCrawlerGUI extends Application {
         // 画师作品按钮事件
         artistStartButton.setOnAction(e -> startArtistCrawling());
         artistStopButton.setOnAction(e -> stopCrawling());
+        
+        // 偏好分析按钮事件
+        selectImagesButton.setOnAction(e -> selectImages());
+        clearImagesButton.setOnAction(e -> clearSelectedImages());
+        analyzeButton.setOnAction(e -> startPreferenceAnalysis());
+        stopAnalyzeButton.setOnAction(e -> stopPreferenceAnalysis());
     }
     
     private void selectSavePath(TextField pathField) {
@@ -1316,8 +1667,21 @@ public class PixivCrawlerGUI extends Application {
     
     private void logMessage(String message) {
         Platform.runLater(() -> {
+            // 检查用户是否正在查看上方的日志
+            // 使用一个更简单的方法：检查滚动条是否在底部附近
+            ScrollPane scrollPane = (ScrollPane) logArea.getParent().getParent();
+            double vvalue = scrollPane.getVvalue();
+            double maxVvalue = scrollPane.getVmax();
+            
+            // 如果滚动条在底部附近（允许5%的误差），则认为用户在底部
+            boolean isAtBottom = (vvalue >= maxVvalue - 0.05);
+            
             logArea.appendText("[" + java.time.LocalTime.now().toString() + "] " + message + "\n");
-            logArea.setScrollTop(Double.MAX_VALUE);
+            
+            // 只有当用户在底部时才自动滚动到底部
+            if (isAtBottom) {
+                scrollPane.setVvalue(1.0);
+            }
         });
     }
     
@@ -1342,7 +1706,321 @@ public class PixivCrawlerGUI extends Application {
         Platform.exit();
     }
     
+    private void selectImages() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("选择图片文件");
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("图片文件", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp")
+        );
+        
+        List<File> selectedFiles = fileChooser.showOpenMultipleDialog(null);
+        if (selectedFiles != null && !selectedFiles.isEmpty()) {
+            selectedImagesList.getItems().addAll(selectedFiles);
+            analyzeStatusLabel.setText("已选择 " + selectedImagesList.getItems().size() + " 张图片");
+            logMessage("已选择 " + selectedFiles.size() + " 张图片进行分析");
+        }
+    }
+    
+    private void clearSelectedImages() {
+        selectedImagesList.getItems().clear();
+        analyzeStatusLabel.setText("准备就绪");
+        logMessage("已清空图片选择列表");
+    }
+    
+    private void startPreferenceAnalysis() {
+        if (isRunning) {
+            showAlert("其他任务正在运行中，请先停止");
+            return;
+        }
+        
+        if (selectedImagesList.getItems().isEmpty()) {
+            showAlert("请先选择要分析的图片");
+            return;
+        }
+        
+        setAnalyzeRunningState(true);
+        logArea.clear();
+        
+        executorService = Executors.newSingleThreadExecutor();
+        
+        executorService.submit(() -> {
+            try {
+                tagService = new TagServiceImpl();
+                
+                Platform.runLater(() -> {
+                    logMessage("开始分析用户偏好词条...");
+                    analyzeStatusLabel.setText("正在分析中...");
+                    analyzeProgressBar.setVisible(true);
+                    analyzeProgressBar.setProgress(0);
+                });
+                
+                List<File> imageFiles = new ArrayList<>(selectedImagesList.getItems());
+                int totalImages = imageFiles.size();
+                
+                // 处理每张图片并更新进度
+                for (int i = 0; i < imageFiles.size(); i++) {
+                    if (!isRunning) break; // 检查是否被停止
+                    
+                    File imageFile = imageFiles.get(i);
+                    Platform.runLater(() -> {
+                        logMessage("正在分析图片: " + imageFile.getName());
+                    });
+                    
+                    tagService.processImage(imageFile);
+                    
+                    final int currentIndex = i + 1;
+                    Platform.runLater(() -> {
+                        double progress = (double) currentIndex / totalImages;
+                        analyzeProgressBar.setProgress(progress);
+                        analyzeStatusLabel.setText("已分析 " + currentIndex + "/" + totalImages + " 张图片");
+                    });
+                }
+                
+                if (isRunning) {
+                    Platform.runLater(() -> {
+                        logMessage("图片分析完成，正在保存偏好词条...");
+                        analyzeStatusLabel.setText("正在保存结果...");
+                    });
+                    
+                    // 保存分析结果
+                    tagService.saveToJson();
+                    
+                    Platform.runLater(() -> {
+                        logMessage("用户偏好词条分析完成并已保存！");
+                        analyzeStatusLabel.setText("分析完成");
+                        setAnalyzeRunningState(false);
+                        // 分析成功后清空图片列表
+                        selectedImagesList.getItems().clear();
+                        showAlert("用户偏好词条分析完成并已保存！");
+                    });
+                }
+                
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    logMessage("偏好分析错误: " + ex.getMessage());
+                    analyzeStatusLabel.setText("分析失败");
+                    setAnalyzeRunningState(false);
+                    showAlert("偏好分析过程中出现错误: " + ex.getMessage());
+                });
+            }
+        });
+    }
+    
+    private void stopPreferenceAnalysis() {
+        if (!isRunning) {
+            return;
+        }
+        
+        isRunning = false;
+        logMessage("正在停止偏好分析...");
+        
+        if (executorService != null) {
+            executorService.shutdown();
+        }
+        
+        setAnalyzeRunningState(false);
+    }
+    
+    private void setAnalyzeRunningState(boolean running) {
+        isRunning = running;
+        
+        if (running) {
+            // 禁用其他功能的开始按钮
+            recommendStartButton.setDisable(true);
+            rankingStartButton.setDisable(true);
+            popularStartButton.setDisable(true);
+            artistStartButton.setDisable(true);
+            
+            // 启用分析停止按钮
+            analyzeButton.setDisable(true);
+            stopAnalyzeButton.setDisable(false);
+            selectImagesButton.setDisable(true);
+            clearImagesButton.setDisable(true);
+        } else {
+            // 启用所有开始按钮
+            recommendStartButton.setDisable(false);
+            rankingStartButton.setDisable(false);
+            popularStartButton.setDisable(false);
+            artistStartButton.setDisable(false);
+            
+            // 禁用分析停止按钮
+            analyzeButton.setDisable(false);
+            stopAnalyzeButton.setDisable(true);
+            selectImagesButton.setDisable(false);
+            clearImagesButton.setDisable(false);
+            
+            // 隐藏进度条
+            analyzeProgressBar.setVisible(false);
+        }
+    }
+    
+    private void refreshTagData() {
+        try {
+            if (tagService == null) {
+                tagService = new TagServiceImpl();
+            }
+            
+            Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
+            ObservableList<TagInfoWrapper> tagList = FXCollections.observableArrayList();
+            
+            for (Map.Entry<String, TagInfo> entry : tagMap.entrySet()) {
+                TagInfo tagInfo = entry.getValue();
+                tagList.add(new TagInfoWrapper(entry.getKey(), tagInfo.getAvgProbability(), tagInfo.getCount()));
+            }
+            
+            tagTableView.setItems(tagList);
+            logMessage("已刷新Tag数据，共 " + tagList.size() + " 个标签");
+            
+        } catch (Exception e) {
+            logMessage("刷新Tag数据失败: " + e.getMessage());
+            showAlert("刷新Tag数据失败: " + e.getMessage());
+        }
+    }
+    
+    private void addNewTag() {
+        // 创建输入对话框
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("添加新Tag");
+        dialog.setHeaderText("请输入新的Tag名称");
+        dialog.setContentText("Tag名称:");
+        
+        dialog.showAndWait().ifPresent(tagName -> {
+            if (!tagName.trim().isEmpty()) {
+                TagInfoWrapper newTag = new TagInfoWrapper(tagName.trim(), 0.5, 1);
+                tagTableView.getItems().add(newTag);
+                logMessage("已添加新Tag: " + tagName);
+            }
+        });
+    }
+    
+    private void deleteSelectedTag() {
+        TagInfoWrapper selectedTag = tagTableView.getSelectionModel().getSelectedItem();
+        if (selectedTag != null) {
+            tagTableView.getItems().remove(selectedTag);
+            logMessage("已删除Tag: " + selectedTag.getTagName());
+        } else {
+            showAlert("请先选择要删除的Tag");
+        }
+    }
+    
+    private void saveTagChanges() {
+        try {
+            if (tagService == null) {
+                tagService = new TagServiceImpl();
+            }
+            
+            // 获取当前内存中的tagMap
+            Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
+            
+            // 清空现有数据
+            tagMap.clear();
+            
+            // 从TableView获取数据并更新到tagMap
+            for (TagInfoWrapper wrapper : tagTableView.getItems()) {
+                TagInfo tagInfo = new TagInfo(wrapper.getAvgProbability(), wrapper.getCount());
+                tagMap.put(wrapper.getTagName(), tagInfo);
+            }
+            
+            // 保存到JSON文件
+            tagService.saveToJson();
+            
+            logMessage("已保存Tag更改，共 " + tagMap.size() + " 个标签");
+            showAlert("Tag更改已保存成功！");
+            
+        } catch (Exception e) {
+            logMessage("保存Tag更改失败: " + e.getMessage());
+            showAlert("保存Tag更改失败: " + e.getMessage());
+        }
+    }
+    
+    private void refreshCharacterTagsData() {
+        try {
+            if (tagService == null) {
+                tagService = new TagServiceImpl();
+            }
+            
+            List<String> characterTags = tagService.getPreferCharacterTags();
+            ObservableList<String> characterList = FXCollections.observableArrayList(characterTags);
+            
+            characterTagsList.setItems(characterList);
+            logMessage("已刷新角色词数据，共 " + characterList.size() + " 个角色词");
+            
+        } catch (Exception e) {
+            logMessage("刷新角色词数据失败: " + e.getMessage());
+            showAlert("刷新角色词数据失败: " + e.getMessage());
+        }
+    }
+    
+    private void addNewCharacterTag() {
+        // 创建输入对话框
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("添加新角色词");
+        dialog.setHeaderText("请输入新的角色词名称");
+        dialog.setContentText("角色词名称:");
+        
+        dialog.showAndWait().ifPresent(characterTag -> {
+            if (!characterTag.trim().isEmpty()) {
+                characterTagsList.getItems().add(characterTag.trim());
+                logMessage("已添加新角色词: " + characterTag);
+            }
+        });
+    }
+    
+    private void deleteSelectedCharacterTag() {
+        String selectedTag = characterTagsList.getSelectionModel().getSelectedItem();
+        if (selectedTag != null) {
+            characterTagsList.getItems().remove(selectedTag);
+            logMessage("已删除角色词: " + selectedTag);
+        } else {
+            showAlert("请先选择要删除的角色词");
+        }
+    }
+    
+    private void saveCharacterTagsChanges() {
+        try {
+            if (tagService == null) {
+                tagService = new TagServiceImpl();
+            }
+            
+            // 从ListView获取数据
+            List<String> characterTags = new ArrayList<>(characterTagsList.getItems());
+            
+            // 保存到JSON文件
+            tagService.saveCharacterTagToJson(characterTags);
+            
+            logMessage("已保存角色词更改，共 " + characterTags.size() + " 个角色词");
+            showAlert("角色词更改已保存成功！");
+            
+        } catch (Exception e) {
+            logMessage("保存角色词更改失败: " + e.getMessage());
+            showAlert("保存角色词更改失败: " + e.getMessage());
+        }
+    }
+
     public static void main(String[] args) {
         launch(args);
+    }
+    
+    // TagInfo包装类，用于TableView显示
+    public static class TagInfoWrapper {
+        private String tagName;
+        private double avgProbability;
+        private int count;
+        
+        public TagInfoWrapper(String tagName, double avgProbability, int count) {
+            this.tagName = tagName;
+            this.avgProbability = avgProbability;
+            this.count = count;
+        }
+        
+        // Getters and Setters
+        public String getTagName() { return tagName; }
+        public void setTagName(String tagName) { this.tagName = tagName; }
+        
+        public double getAvgProbability() { return avgProbability; }
+        public void setAvgProbability(double avgProbability) { this.avgProbability = avgProbability; }
+        
+        public int getCount() { return count; }
+        public void setCount(int count) { this.count = count; }
     }
 }

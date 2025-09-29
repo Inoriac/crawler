@@ -8,6 +8,7 @@ import com.pixiv.crawler.model.CharacterTagHolder;
 import com.pixiv.crawler.model.TagInfo;
 import com.pixiv.crawler.model.TagMapHolder;
 import com.pixiv.crawler.service.TagService;
+import com.pixiv.crawler.util.JsonUtil;
 import okhttp3.*;
 
 import java.io.File;
@@ -59,7 +60,7 @@ public class TagServiceImpl implements TagService {
                 .build();
 
         // 添加调试信息
-        System.out.println("【TagService】上传图片: " + imageFile.getName() +
+        System.out.println("【TagService】上传图片: " + JsonUtil.unescapeUnicodePublic(imageFile.getName()) +
                           ", 大小: " + imageFile.length() + " bytes, " +
                           "MediaType: " + mediaType);
 
@@ -143,7 +144,10 @@ public class TagServiceImpl implements TagService {
 
     @Override
     public void processImages(List<File> imageFiles)  throws IOException{
+        int i = 0;
         for(File imageFile : imageFiles){
+            i ++;
+            System.out.println("【TagService】分析第" + i + "张图片");
             processImage(imageFile);
         }
     }

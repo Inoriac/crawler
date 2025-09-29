@@ -503,6 +503,13 @@ public class JsonUtil {
     }
 
     /**
+     * 将Unicode转义字符转换为正常字符（公共方法）
+     */
+    public static String unescapeUnicodePublic(String str) {
+        return unescapeUnicode(str);
+    }
+    
+    /**
      * 将Unicode转义字符转换为正常字符
      */
     private static String unescapeUnicode(String str) {

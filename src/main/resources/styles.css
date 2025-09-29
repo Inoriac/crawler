@@ -12,6 +12,23 @@
     -fx-background-color: rgba(255, 255, 255, 0.0);
 }
 
+/* 左侧滚动面板 */
+.left-scroll-pane {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-padding: 2;
+}
+
+.left-scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.left-scroll-pane .content {
+    -fx-background-color: transparent;
+}
+
 /* 右侧面板 */
 .right-panel {
     -fx-background-color: rgba(255, 255, 255, 0.35);

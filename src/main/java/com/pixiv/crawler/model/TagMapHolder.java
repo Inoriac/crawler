@@ -5,15 +5,14 @@ import com.pixiv.crawler.service.impl.TagServiceImpl;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class TagMapHolder {
     private static final TagMapHolder INSTANCE = new TagMapHolder();    // 单例
     private final Map<String, TagInfo> tagMap;
 
     private TagMapHolder() {
-        TagService tagService = new TagServiceImpl();
         try {
+            TagService tagService = new TagServiceImpl();
             this.tagMap = tagService.loadFromJson();
         } catch (IOException e) {
             throw new RuntimeException(e);
