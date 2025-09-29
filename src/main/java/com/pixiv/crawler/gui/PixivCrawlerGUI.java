@@ -14,6 +14,7 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -45,6 +46,7 @@ import com.pixiv.crawler.model.TagMapHolder;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
+// TODO：启动时内存占用过高，可以考虑各部分组件的懒加载，只有打开对应界面的时候，才对其进行加载，不看的页面直接从内存中去除(?)
 public class PixivCrawlerGUI extends Application {
     
     // 日志区域
@@ -294,56 +296,68 @@ public class PixivCrawlerGUI extends Application {
         
         return functionPanel;
     }
-    
+
     private VBox createSettingsPanel() {
         VBox settingsPanel = new VBox(15);
         settingsPanel.setPadding(new Insets(20));
         settingsPanel.getStyleClass().add("transparent-panel");
-        
+
         // 标题
         Label titleLabel = new Label("系统设置");
         titleLabel.getStyleClass().addAll("settings-title-label", "black-text");
         titleLabel.setAlignment(Pos.CENTER);
-        
+
         // 网络设置
         TitledPane networkPane = createNetworkSettingsPane();
-        
+
         // 下载设置
         TitledPane downloadPane = createDownloadSettingsPane();
-        
+
         // 算法设置
         TitledPane algorithmPane = createAlgorithmSettingsPane();
-        
+
         // Tag服务设置
         TitledPane tagServicePane = createTagServiceSettingsPane();
-        
+
         // 路径设置
         TitledPane pathPane = createPathSettingsPane();
-        
+
         // 保存按钮
         Button saveButton = new Button("保存设置");
         saveButton.setPrefWidth(120);
         saveButton.setPrefHeight(40);
         saveButton.getStyleClass().add("settings-button");
         saveButton.setOnAction(e -> saveSettings());
-        
+
         HBox buttonBox = new HBox();
         buttonBox.setAlignment(Pos.CENTER);
         buttonBox.getChildren().add(saveButton);
-        
+
         settingsPanel.getChildren().addAll(
-            titleLabel,
-            networkPane,
-            downloadPane,
-            algorithmPane,
-            tagServicePane,
-            pathPane,
-            buttonBox
+                titleLabel,
+                networkPane,
+                downloadPane,
+                algorithmPane,
+                tagServicePane,
+                pathPane,
+                buttonBox
         );
-        
-        return settingsPanel;
+
+        // 包装 VBox 以支持滚动
+        ScrollPane scrollPane = new ScrollPane(settingsPanel);
+        scrollPane.setFitToWidth(true);  // 自动调整宽度
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);  // 始终显示垂直滚动条
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);  // 不显示水平滚动条
+        scrollPane.getStyleClass().add("left-scroll-pane");
+
+
+        // 将 ScrollPane 的内容返回作为 VBox
+        VBox scrollContainer = new VBox(scrollPane); // 包装一个 VBox 来存放 ScrollPane
+        return scrollContainer;  // 返回 VBox 类型
     }
-    
+
+
+
     private TitledPane createNetworkSettingsPane() {
         VBox content = new VBox(10);
         content.setPadding(new Insets(10));
@@ -1181,7 +1195,7 @@ public class PixivCrawlerGUI extends Application {
         tagTableView = new TableView<>();
         tagTableView.setPrefHeight(400);
         tagTableView.setEditable(true);
-        tagTableView.setOpacity(0.3);
+        tagTableView.setOpacity(0.7);
         
         // 创建列
         TableColumn<TagInfoWrapper, String> tagNameColumn = new TableColumn<>("Tag名称");
@@ -1219,59 +1233,56 @@ public class PixivCrawlerGUI extends Application {
         characterTagsList = new ListView<>();
         characterTagsList.setPrefHeight(400);
         characterTagsList.setPrefWidth(250);
+        characterTagsList.setOpacity(0.7);
         
         characterManagementBox.getChildren().addAll(characterLabel, characterTagsList);
         
         contentLayout.getChildren().addAll(tagManagementBox, characterManagementBox);
-        
+
+        // 让两个子节点都可以拉伸
+        HBox.setHgrow(tagManagementBox, Priority.ALWAYS);
+        HBox.setHgrow(characterManagementBox, Priority.ALWAYS);
+
+        // 绑定宽度比例（7:3）
+        contentLayout.widthProperty().addListener((obs, oldVal, newVal) -> {
+            double totalWidth = newVal.doubleValue();
+            tagManagementBox.setPrefWidth(totalWidth * 0.7);  // 左边 70%
+            characterManagementBox.setPrefWidth(totalWidth * 0.3);  // 右边 30%
+        });
+
         // 按钮区域
         HBox buttonBox = new HBox(15);
         buttonBox.setAlignment(Pos.CENTER);
-        
+
+        // 创建按钮
         refreshTagsButton = new Button("刷新数据");
-        refreshTagsButton.setPrefWidth(100);
-        refreshTagsButton.getStyleClass().add("settings-button");
-        refreshTagsButton.setOnAction(e -> refreshTagData());
-        
         addTagButton = new Button("添加Tag");
-        addTagButton.setPrefWidth(100);
-        addTagButton.getStyleClass().add("settings-button");
-        addTagButton.setOnAction(e -> addNewTag());
-        
         deleteTagButton = new Button("删除选中");
-        deleteTagButton.setPrefWidth(100);
-        deleteTagButton.getStyleClass().add("settings-button");
-        deleteTagButton.setOnAction(e -> deleteSelectedTag());
-        
         saveTagsButton = new Button("保存Tag");
-        saveTagsButton.setPrefWidth(100);
-        saveTagsButton.getStyleClass().add("settings-button");
-        saveTagsButton.setOnAction(e -> saveTagChanges());
-        
-        // 角色词管理按钮
+
         refreshCharacterTagsButton = new Button("刷新角色词");
-        refreshCharacterTagsButton.setPrefWidth(100);
-        refreshCharacterTagsButton.getStyleClass().add("settings-button");
-        refreshCharacterTagsButton.setOnAction(e -> refreshCharacterTagsData());
-        
         addCharacterTagButton = new Button("添加角色词");
-        addCharacterTagButton.setPrefWidth(100);
-        addCharacterTagButton.getStyleClass().add("settings-button");
-        addCharacterTagButton.setOnAction(e -> addNewCharacterTag());
-        
         deleteCharacterTagButton = new Button("删除角色词");
-        deleteCharacterTagButton.setPrefWidth(100);
-        deleteCharacterTagButton.getStyleClass().add("settings-button");
-        deleteCharacterTagButton.setOnAction(e -> deleteSelectedCharacterTag());
-        
         saveCharacterTagsButton = new Button("保存角色词");
-        saveCharacterTagsButton.setPrefWidth(100);
-        saveCharacterTagsButton.getStyleClass().add("settings-button");
-        saveCharacterTagsButton.setOnAction(e -> saveCharacterTagsChanges());
-        
-        buttonBox.getChildren().addAll(refreshTagsButton, addTagButton, deleteTagButton, saveTagsButton,
-                                     refreshCharacterTagsButton, addCharacterTagButton, deleteCharacterTagButton, saveCharacterTagsButton);
-        
+
+        // 设置按钮宽度
+        for (Button button : new Button[]{refreshTagsButton, addTagButton, deleteTagButton, saveTagsButton,
+                refreshCharacterTagsButton, addCharacterTagButton, deleteCharacterTagButton, saveCharacterTagsButton}) {
+            button.setPrefWidth(150); // 设置按钮的宽度
+            button.getStyleClass().add("settings-button");
+        }
+
+        // 使用 Region 使按钮拉伸到适当的空间
+        Region spacer1 = new Region();
+        HBox.setHgrow(spacer1, Priority.ALWAYS);
+        Region spacer2 = new Region();
+        HBox.setHgrow(spacer2, Priority.ALWAYS);
+
+        buttonBox.getChildren().addAll(refreshTagsButton, addTagButton, deleteTagButton, saveTagsButton, spacer1,
+                refreshCharacterTagsButton, addCharacterTagButton, deleteCharacterTagButton, saveCharacterTagsButton);
+
+        contentLayout.getChildren().add(buttonBox);
+
         // 说明文本
         Label infoLabel = new Label("提示：左侧双击单元格可编辑Tag，右侧选择角色词后点击删除按钮可删除");
         infoLabel.getStyleClass().add("black-text");
@@ -1664,26 +1675,34 @@ public class PixivCrawlerGUI extends Application {
             artistStopButton.setDisable(true);
         }
     }
-    
+
     private void logMessage(String message) {
         Platform.runLater(() -> {
             // 检查用户是否正在查看上方的日志
             // 使用一个更简单的方法：检查滚动条是否在底部附近
-            ScrollPane scrollPane = (ScrollPane) logArea.getParent().getParent();
-            double vvalue = scrollPane.getVvalue();
-            double maxVvalue = scrollPane.getVmax();
-            
-            // 如果滚动条在底部附近（允许5%的误差），则认为用户在底部
-            boolean isAtBottom = (vvalue >= maxVvalue - 0.05);
-            
-            logArea.appendText("[" + java.time.LocalTime.now().toString() + "] " + message + "\n");
-            
-            // 只有当用户在底部时才自动滚动到底部
-            if (isAtBottom) {
-                scrollPane.setVvalue(1.0);
+            Node parent = logArea.getParent().getParent();
+
+            if (parent instanceof ScrollPane) {
+                ScrollPane scrollPane = (ScrollPane) parent;
+                double vvalue = scrollPane.getVvalue();
+                double maxVvalue = scrollPane.getVmax();
+
+                // 如果滚动条在底部附近（允许5%的误差），则认为用户在底部
+                boolean isAtBottom = (vvalue >= maxVvalue - 0.05);
+
+                logArea.appendText("[" + java.time.LocalTime.now().toString() + "] " + message + "\n");
+
+                // 只有当用户在底部时才自动滚动到底部
+                if (isAtBottom) {
+                    scrollPane.setVvalue(1.0);
+                }
+            } else {
+                // 如果没有找到 ScrollPane，可以做些处理或记录警告
+                System.out.println("Warning: Parent is not a ScrollPane.");
             }
         });
     }
+
     
     private void showAlert(String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);

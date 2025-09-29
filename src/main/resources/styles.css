@@ -230,3 +230,7 @@
 .bold-text {
     -fx-font-weight: bold;
 }
+
+.label {
+    -fx-text-fill: black;
+}
