@@ -108,13 +108,6 @@ public class TagServiceTest {
         System.out.println("JSON加载测试通过");
     }
     @Test
-    public void testClearJson() {
-        // 测试清理功能
-        tagService.clearJson();
-        System.out.println("JSON清理测试通过");
-    }
-
-    @Test
     public void testJsonRoundTrip() throws IOException {
         // 测试完整的保存-加载循环
         Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();

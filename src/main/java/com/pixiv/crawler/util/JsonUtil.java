@@ -143,6 +143,15 @@ public class JsonUtil {
             List<String> tags = parseTags(responseText);
             image.setTags(tags);
 
+            TagService tagService = new TagServiceImpl();
+            double v = Math.min(tagService.calculateTagSimilarity(image.getTags()) + GlobalConfig.BASE_PROBABILITY, 1);
+            System.out.println("【TagService】图片匹配度为:" + v);
+
+            if(random.nextDouble() > v) {
+                System.out.println("【TagService】匹配度过低，舍弃");
+                image = null;
+            }
+
             // 检测R-18和漫画
             detectContentFlags(tags, image);
 

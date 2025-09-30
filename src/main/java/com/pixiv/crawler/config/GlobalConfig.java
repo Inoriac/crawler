@@ -92,7 +92,8 @@ public class GlobalConfig {
     public static  String PIXIV_RANKING_URL = "https://www.pixiv.net/ranking.php?mode=daily&content=illust";    // 日榜作品获取地址
     public static String LOCAL_MAPPING_URL = "/mapping.json"; // 本地映射用json路径
     public static double PUNISHMENT = 0.11; // 惩罚强度
-    public static double REWARD = 0.2;  // 奖励强度，出现与用户偏好匹配的角色词时增加图片选取概率
+    public static double REWARD = 0.16;  // 奖励强度，出现与用户偏好匹配的角色词时增加图片选取概率
+    public static double BASE_PROBABILITY = 0.19;    // 选取图片基本概率，避免图片下载过少
 
 
     // 验证概率总和是否为1

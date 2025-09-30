@@ -143,16 +143,6 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
-    public void processImages(List<File> imageFiles)  throws IOException{
-        int i = 0;
-        for(File imageFile : imageFiles){
-            i ++;
-            System.out.println("【TagService】分析第" + i + "张图片");
-            processImage(imageFile);
-        }
-    }
-
-    @Override
     public List<String> getPreferCharacterTags() throws IOException{
         // 尝试打开 filename 文件
         File file = new File(GlobalConfig.TAG_SERVICE_JSON_NAME_CHARACTER);
@@ -232,26 +222,6 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
-    public void clearJson() {
-        File dir = new File(".");
-        File[] backups = dir.listFiles((d, name) -> name.startsWith("tags_backup_") && name.endsWith(".json"));
-
-        if(backups == null || backups.length <= GlobalConfig.TAG_SERVICE_JSON_FILE_MAX_NUMBER) return;
-
-        // 按最后修改时间排序
-        Arrays.sort(backups, Comparator.comparingLong(File::lastModified));
-
-        int filesToDelete = backups.length - GlobalConfig.TAG_SERVICE_JSON_FILE_MAX_NUMBER;
-        for (int i = 0; i < filesToDelete; i++){
-            if(backups[i].delete()) {
-                System.out.println("【TagService】已删除旧备份：" + backups[i].getName());
-            } else {
-                System.out.println("【TagService】删除失败：" + backups[i].getName());
-            }
-        }
-    }
-
-    @Override
     public double calculateTagSimilarity(List<String> tags) {
         Map<String, TagInfo> tagMap = TagMapHolder.getInstance().getTagMap();
         List<String> characterTags = CharacterTagHolder.getInstance().getCharacterTags();
@@ -295,7 +265,7 @@ public class TagServiceImpl implements TagService {
         OkHttpClient client = new OkHttpClient.Builder()
                 .proxy(proxy)
                 .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(90, TimeUnit.SECONDS)
                 .build();
 
         // 构建请求

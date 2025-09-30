@@ -440,9 +440,10 @@ public class PixivCrawler {
                     if (image != null) {
                         selected.add(image);
                         System.out.println("【调试】成功选择图片: " + selectedPid);
-                    } else {
-                        System.out.println("【警告】获取图片信息失败，跳过: " + selectedPid);
                     }
+//                    else {
+//                        System.out.println("【警告】获取图片信息失败，跳过: " + selectedPid);
+//                    }
                 }
             }
         }

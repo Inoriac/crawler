@@ -13,8 +13,6 @@ public interface TagService {
     public Map<String, Double> getTags(File imageFile) throws IOException;
     // 处理单张图片
     public void processImage(File imageFile) throws IOException;
-    // 批量处理图片
-    public void processImages(List<File> imageFiles) throws IOException;
 
     // 获取用户偏好角色词条
     public List<String> getPreferCharacterTags() throws IOException;
@@ -25,8 +23,6 @@ public interface TagService {
     public void saveToJson();
     // 加载 json 文件到 tagmap
     public Map<String, TagInfo> loadFromJson() throws IOException;
-    // 清理旧的 json
-    public void clearJson();
 
     // 计算 tag 相似度，用于衡量图片匹配度
     public double calculateTagSimilarity(List<String> tags);
